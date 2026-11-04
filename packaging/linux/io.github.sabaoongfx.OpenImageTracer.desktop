@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Image Tracer
+Name=Open Image Tracer
 GenericName=Image to SVG Converter
 Comment=Convert images (PNG, JPEG, …) into SVG vectors
 Exec=open-image-tracer %f

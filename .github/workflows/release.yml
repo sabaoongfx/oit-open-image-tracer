@@ -194,7 +194,7 @@ jobs:
           $msi = (Resolve-Path dist\*.msi).Path
           $p = Start-Process msiexec -ArgumentList "/i", "`"$msi`"", "/qn", "/l*v", "msi-install.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content msi-install.log -Tail 40; throw "msiexec failed: $($p.ExitCode)" }
-          $exe = "C:\Program Files\Image Tracer\open-image-tracer.exe"
+          $exe = "C:\Program Files\Open Image Tracer\open-image-tracer.exe"
           if (-not (Test-Path $exe)) { throw "not installed: $exe" }
           $t = Start-Process -FilePath $exe -ArgumentList "--self-test", "self-test-msi" -Wait -PassThru
           Get-Content self-test-msi\self-test.txt
@@ -227,7 +227,7 @@ jobs:
       - name: Build app and dmg
         run: packaging/macos/build.sh dist
       - name: Self-test
-        run: '"build/macos/dist/Image Tracer.app/Contents/MacOS/open-image-tracer" --self-test self-test'
+        run: '"build/macos/dist/Open Image Tracer.app/Contents/MacOS/open-image-tracer" --self-test self-test'
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: 'self-test-${{ matrix.runner }}', path: self-test}
@@ -264,5 +264,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --draft \
-              --title "Image Tracer ${{ needs.version.outputs.version }}" \
+              --title "Open Image Tracer ${{ needs.version.outputs.version }}" \
               --notes "See the assets below to download and install this version."

@@ -29,7 +29,7 @@ DESKTOP = os.path.join(DATA, "applications", APP_ID + ".desktop")
 
 ENTRY = f"""[Desktop Entry]
 Type=Application
-Name=Image Tracer
+Name=Open Image Tracer
 GenericName=Image to SVG Converter
 Comment=Convert images (PNG, JPEG, …) into SVG vectors
 Exec={sys.executable} {os.path.join(ROOT, "image_tracer.py")} %f

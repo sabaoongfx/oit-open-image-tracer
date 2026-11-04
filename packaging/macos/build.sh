@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Build "Image Tracer.app" and a .dmg with Homebrew's GTK 4 stack.
+# Build "Open Image Tracer.app" and a .dmg with Homebrew's GTK 4 stack.
 #   packaging/macos/build.sh OUTDIR
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -32,8 +32,8 @@ export APP_ICON="$BUILD/app.icns"
 # .dmg with the app and an Applications shortcut
 STAGE="$BUILD/dmg"
 mkdir -p "$STAGE"
-cp -R "$BUILD/dist/Image Tracer.app" "$STAGE/"
+cp -R "$BUILD/dist/Open Image Tracer.app" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 NAME=$([ "$ARCH" = arm64 ] && echo aarch64 || echo x64)
-hdiutil create -volname "Image Tracer" -srcfolder "$STAGE" -ov -format UDZO \
+hdiutil create -volname "Open Image Tracer" -srcfolder "$STAGE" -ov -format UDZO \
     "$OUT/Open-Image-Tracer-$VERSION-$NAME.dmg"

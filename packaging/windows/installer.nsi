@@ -1,12 +1,12 @@
 ; SPDX-License-Identifier: GPL-3.0-or-later
-; NSIS installer for Image Tracer. Defines passed by build.sh:
+; NSIS installer for Open Image Tracer. Defines passed by build.sh:
 ;   VERSION, SRC (PyInstaller folder), ICON, LICENSE, OUTFILE
 Unicode true
 !include "MUI2.nsh"
 
-Name "Image Tracer"
+Name "Open Image Tracer"
 OutFile "${OUTFILE}"
-InstallDir "$PROGRAMFILES64\Image Tracer"
+InstallDir "$PROGRAMFILES64\Open Image Tracer"
 InstallDirRegKey HKLM "Software\OpenImageTracer" "InstallDir"
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
@@ -24,13 +24,13 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 
-Section "Image Tracer"
+Section "Open Image Tracer"
   SetOutPath "$INSTDIR"
   File /r "${SRC}\*.*"
-  CreateShortcut "$SMPROGRAMS\Image Tracer.lnk" "$INSTDIR\open-image-tracer.exe"
+  CreateShortcut "$SMPROGRAMS\Open Image Tracer.lnk" "$INSTDIR\open-image-tracer.exe"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   WriteRegStr HKLM "Software\OpenImageTracer" "InstallDir" "$INSTDIR"
-  WriteRegStr HKLM "${UNINST_KEY}" "DisplayName" "Image Tracer"
+  WriteRegStr HKLM "${UNINST_KEY}" "DisplayName" "Open Image Tracer"
   WriteRegStr HKLM "${UNINST_KEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr HKLM "${UNINST_KEY}" "Publisher" "Sabaoon"
   WriteRegStr HKLM "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\open-image-tracer.exe"
@@ -40,7 +40,7 @@ Section "Image Tracer"
 SectionEnd
 
 Section "Uninstall"
-  Delete "$SMPROGRAMS\Image Tracer.lnk"
+  Delete "$SMPROGRAMS\Open Image Tracer.lnk"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKLM "${UNINST_KEY}"
   DeleteRegKey HKLM "Software\OpenImageTracer"

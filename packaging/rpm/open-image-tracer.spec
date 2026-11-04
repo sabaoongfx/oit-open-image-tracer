@@ -20,7 +20,7 @@ Recommends:     tesseract
 Recommends:     tesseract-langpack-eng
 
 %description
-Image Tracer turns bitmaps (PNG, JPEG, ...) into scalable SVG vectors, with
+Open Image Tracer turns bitmaps (PNG, JPEG, ...) into scalable SVG vectors, with
 presets for logos, screenshots and line art, OCR for real SVG text, and a
 side-by-side preview.
 

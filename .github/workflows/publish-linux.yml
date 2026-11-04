@@ -85,10 +85,10 @@ jobs:
           gpg --armor --export > public/KEY.gpg
           touch public/.nojekyll
           cat > public/index.html <<HTML
-          <!doctype html><meta charset="utf-8"><title>Image Tracer packages</title>
-          <h1>Image Tracer package repositories</h1>
+          <!doctype html><meta charset="utf-8"><title>Open Image Tracer packages</title>
+          <h1>Open Image Tracer package repositories</h1>
           <p>Signed apt and pacman repositories for
-          <a href="https://github.com/sabaoongfx/oit-open-image-tracer">Image Tracer</a>
+          <a href="https://github.com/sabaoongfx/oit-open-image-tracer">Open Image Tracer</a>
           ($TAG). Setup instructions are in the project's README.</p>
           HTML
       - uses: actions/download-artifact@v4

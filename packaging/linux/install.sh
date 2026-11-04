@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Install Image Tracer into DESTDIR/PREFIX. Shared by the .deb, .rpm, pacman and
+# Install Open Image Tracer into DESTDIR/PREFIX. Shared by the .deb, .rpm, pacman and
 # Flatpak builds so they all ship the same files.
 #   packaging/linux/install.sh DESTDIR PREFIX      e.g.  pkgroot /usr   or   "" /app
 set -eu

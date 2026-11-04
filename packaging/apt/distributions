@@ -1,8 +1,8 @@
 # reprepro config for the apt repo published to GitHub Pages by .github/workflows/publish-linux.yml
-Origin: Image Tracer
-Label: Image Tracer
+Origin: Open Image Tracer
+Label: Open Image Tracer
 Codename: stable
 Architectures: amd64 arm64
 Components: main
-Description: Image Tracer - convert images into SVG vectors
+Description: Open Image Tracer - convert images into SVG vectors
 SignWith: yes

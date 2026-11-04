@@ -56,13 +56,13 @@ coll = COLLECT(exe, a.binaries, a.datas, name="open-image-tracer")
 if sys.platform == "darwin":
     app = BUNDLE(
         coll,
-        name="Image Tracer.app",
+        name="Open Image Tracer.app",
         icon=os.environ.get("APP_ICON") or None,
         bundle_identifier=APP_ID,
         version=VERSION,
         info_plist={
-            "CFBundleName": "Image Tracer",
-            "CFBundleDisplayName": "Image Tracer",
+            "CFBundleName": "Open Image Tracer",
+            "CFBundleDisplayName": "Open Image Tracer",
             "CFBundleShortVersionString": VERSION,
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",

@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later
-     MSI for Image Tracer (WiX v5). Variables: Version, Source (PyInstaller folder), Icon. -->
+     MSI for Open Image Tracer (WiX v5). Variables: Version, Source (PyInstaller folder), Icon. -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="Image Tracer" Manufacturer="Sabaoon" Version="$(var.Version)"
+  <Package Name="Open Image Tracer" Manufacturer="Sabaoon" Version="$(var.Version)"
            UpgradeCode="6B3F0C2A-8E1D-4B7A-9F25-3C4D5E6F7A81" Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Image Tracer is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Open Image Tracer is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="AppIcon" SourceFile="$(var.Icon)" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="Image Tracer" />
+      <Directory Id="INSTALLFOLDER" Name="Open Image Tracer" />
     </StandardDirectory>
 
-    <Feature Id="Main" Title="Image Tracer">
+    <Feature Id="Main" Title="Open Image Tracer">
       <Files Directory="INSTALLFOLDER" Include="$(var.Source)\**" />
       <ComponentRef Id="StartMenuShortcut" />
     </Feature>
 
     <StandardDirectory Id="ProgramMenuFolder">
       <Component Id="StartMenuShortcut" Guid="9D2E4F61-3A7B-4C85-B1E2-7F8A9B0C1D23">
-        <Shortcut Id="AppShortcut" Name="Image Tracer"
+        <Shortcut Id="AppShortcut" Name="Open Image Tracer"
                   Target="[INSTALLFOLDER]open-image-tracer.exe" WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue Root="HKLM" Key="Software\OpenImageTracer" Name="StartMenuShortcut"
                        Type="integer" Value="1" KeyPath="yes" />

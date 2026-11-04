@@ -1,10 +1,17 @@
-# Image Tracer — notes for Claude
+# Open Image Tracer — notes for Claude
 
 Standalone GTK 4 desktop app that converts bitmaps to SVG (like Inkscape's
 Trace Bitmap). Python 3.14 on Manjaro/KDE (Wayland); dependencies are only
 numpy, Pillow, PyGObject, pycairo and libpotrace (ctypes), optional tesseract.
 No scipy/OpenCV/pytest on the machine. Repo: github.com/sabaoongfx/oit-open-image-tracer
 (public, branch `main`). License GPL-3.0-or-later.
+
+Display name: **Open Image Tracer** (window title, menu entry, installers,
+macOS app, docs). Internal names stay: app id
+`io.github.sabaoongfx.OpenImageTracer`, package/command `open-image-tracer`,
+Windows registry key `OpenImageTracer`, and the signing key's UID
+**"Image Tracer packages"** (users type it in `pacman-key --lsign-key`; renaming
+it would need a new key).
 
 ## Ground rules from the user
 

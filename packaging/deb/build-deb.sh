@@ -28,7 +28,7 @@ Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0 (>= 4.1
 Recommends: tesseract-ocr, tesseract-ocr-eng
 Homepage: https://github.com/sabaoongfx/oit-open-image-tracer
 Description: Convert images into SVG vectors
- Image Tracer turns bitmaps (PNG, JPEG, ...) into scalable SVG vectors, with
+ Open Image Tracer turns bitmaps (PNG, JPEG, ...) into scalable SVG vectors, with
  presets for logos, screenshots and line art, OCR for real SVG text, and a
  side-by-side preview.
 CONTROL

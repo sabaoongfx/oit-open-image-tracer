@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Image Tracer - a small standalone "Trace Bitmap" app (bitmap -> SVG)."""
+"""Open Image Tracer - a small standalone "Trace Bitmap" app (bitmap -> SVG)."""
 from __future__ import annotations
 
 import contextlib
@@ -381,7 +381,7 @@ def _separator() -> Gtk.Separator:
 # --------------------------------------------------------------------------
 class TracerWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Image Tracer",
+        super().__init__(application=app, title="Open Image Tracer",
                          default_width=1100, default_height=720)
         self.image = None
         self.image_path = None
@@ -433,7 +433,7 @@ class TracerWindow(Gtk.ApplicationWindow):
         self.copy_btn = Gtk.Button(label="Copy SVG", sensitive=False)
         self.copy_btn.connect("clicked", self.on_copy)
         header.pack_end(self.copy_btn)
-        header.set_title_widget(Gtk.Label(label="Image Tracer", css_classes=["title"]))
+        header.set_title_widget(Gtk.Label(label="Open Image Tracer", css_classes=["title"]))
 
     def _build_layout(self) -> Gtk.Box:
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL, position=350,
@@ -700,7 +700,7 @@ class TracerWindow(Gtk.ApplicationWindow):
         self.canvas.result = None
         self.canvas.set_original(img)
         self.orig_canvas.set_original(img)
-        self.set_title(f"Image Tracer — {os.path.basename(path)}")
+        self.set_title(f"Open Image Tracer — {os.path.basename(path)}")
         self.retrace()
 
     def on_drop(self, _target, value, _x, _y):
