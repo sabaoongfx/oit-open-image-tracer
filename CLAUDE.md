@@ -12,7 +12,9 @@ python3 image_tracer.py [image]                  # run the app
 python3 -m unittest discover -s tests -v         # 20 tests (OCR/GUI auto-skip if unavailable)
 UPDATE_GOLDEN=1 python3 -m unittest discover -s tests   # only after an intended output change
 python3 tools/make_thumbs.py                     # after editing presets.py / modes
-python3 tools/gradient_trace.py in.png out.svg   # experimental gradient vectorizer (WIP)
+python3 tools/gradient_trace.py in.png out.svg   # gradient vectorizer (logos/icons)
+python3 tools/make_app_icon.py                   # icon set from assets/icon-source.png
+python3 tools/install_desktop.py [--uninstall]   # user launcher + icon (APP_ID local.imagetracer)
 ```
 
 ## Architecture (single sources of truth)

@@ -23,8 +23,10 @@ import trace_engine as te  # noqa: E402
 
 log = logging.getLogger("image_tracer")
 
+APP_ID = "local.imagetracer"  # also the icon name and .desktop file name
 HERE = os.path.dirname(os.path.abspath(__file__))
 THUMB_DIR = os.path.join(HERE, "assets", "thumbs")
+ICON_DIR = os.path.join(HERE, "assets", "icons")  # hicolor theme with APP_ID icons
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
                       "image-tracer", "config.json")
 IMAGE_PATTERNS = ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.tif", "*.tiff", "*.webp"]
@@ -762,15 +764,19 @@ class TracerWindow(Gtk.ApplicationWindow):
 
 class TracerApp(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id="local.imagetracer",
+        super().__init__(application_id=APP_ID,
                          flags=Gio.ApplicationFlags.HANDLES_OPEN)
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
         css = Gtk.CssProvider()
         css.load_from_data(CSS)
-        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css,
+        display = Gdk.Display.get_default()
+        Gtk.StyleContext.add_provider_for_display(display, css,
                                                   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        # App icon: works from the project folder too, before tools/install_desktop.py.
+        Gtk.IconTheme.get_for_display(display).add_search_path(ICON_DIR)
+        Gtk.Window.set_default_icon_name(APP_ID)
 
     def _window(self) -> TracerWindow:
         win = self.props.active_window or TracerWindow(self)

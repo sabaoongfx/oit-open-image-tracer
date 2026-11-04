@@ -14,6 +14,16 @@ python3 image_tracer.py [image]
 **Simple** shows only presets and modes; **Advanced** shows every setting.
 Each slider has a field next to it for typing exact values.
 
+## Install the app icon and launcher
+
+```sh
+python3 tools/install_desktop.py            # menu entry + icon for your user (no root)
+python3 tools/install_desktop.py --uninstall
+```
+
+The icon set in `assets/icons/` is generated from `assets/icon-source.png` by
+`tools/make_app_icon.py` (black corners become transparent).
+
 ## Requirements (Arch / Manjaro package names)
 
 | Needed for | Packages |
