@@ -1,0 +1,109 @@
+id: io.github.sabaoongfx.OpenImageTracer
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: open-image-tracer
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # tesseract built with CMake has no compiled-in data path
+  - --env=TESSDATA_PREFIX=/app/share/tessdata
+  # No filesystem or network access: images are opened and SVGs saved
+  # through the file chooser / drag & drop portals.
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /lib/cmake
+  - /share/man
+  - '*.la'
+  - '*.a'
+
+modules:
+  - name: potrace
+    config-opts:
+      - --with-libpotrace
+      - --disable-static
+    sources:
+      - type: archive
+        url: https://potrace.sourceforge.net/download/1.16/potrace-1.16.tar.gz
+        sha256: be8248a17dedd6ccbaab2fcc45835bb0502d062e40fbded3bc56028ce5eb7acc
+    cleanup:
+      - /bin
+      - /share/doc
+
+  - name: leptonica
+    config-opts:
+      - --disable-static
+      - --disable-programs
+    sources:
+      - type: archive
+        url: https://github.com/DanBloomberg/leptonica/releases/download/1.87.0/leptonica-1.87.0.tar.gz
+        sha256: c73363397f96eb1295602bf44d708a994ad42046c791bf03ea0505d829bdb6a7
+
+  - name: tesseract
+    buildsystem: cmake-ninja
+    builddir: true  # tesseract refuses in-source CMake builds
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_SHARED_LIBS=ON
+      - -DBUILD_TRAINING_TOOLS=OFF
+      - -DBUILD_TESTS=OFF
+      - -DGRAPHICS_DISABLED=ON
+      - -DDISABLE_CURL=ON
+      - -DDISABLE_ARCHIVE=ON
+      - -DOPENMP_BUILD=OFF
+      - -DSW_BUILD=OFF
+    sources:
+      - type: archive
+        url: https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.3.tar.gz
+        sha256: 9218e62793116d42a9f6d14cd9348518b27f382096eea3d0f2d1a24616bb5884
+
+  - name: tessdata-eng
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 eng.traineddata /app/share/tessdata/eng.traineddata
+    sources:
+      # Same model as the distribution package (tessdata 4.1.0).
+      - type: file
+        url: https://github.com/tesseract-ocr/tessdata/raw/4.1.0/eng.traineddata
+        sha256: daa0c97d651c19fba3b25e81317cd697e9908c8208090c94c3905381c23fc047
+
+  - name: python3-deps
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --no-deps --prefix=/app --find-links=. numpy pillow
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/45/8f/9beacf79ca7c650688ad0baa80931adb988fe6e6e5d5903c23cc3dbd70eb/numpy-2.5.3-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+        sha256: b0521d0f4aebb6e06189451025fa17a913287b13c03d5fe05c017333b654ea5b
+      - type: file
+        url: https://files.pythonhosted.org/packages/5c/44/c85361f65dbe00eea8576ee467c768d25129989efb76e94f205e9ca9bb46/pillow-12.3.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 251bf95b67017e27b13d82f5b326234ca62d70f9cf4c2b9032de2358a3b12c7b
+
+  - name: open-image-tracer
+    buildsystem: simple
+    build-commands:
+      - install -d /app/share/open-image-tracer
+      - install -m644 image_tracer.py trace_engine.py centerline.py presets.py
+        /app/share/open-image-tracer/
+      - install -d /app/share/open-image-tracer/assets /app/share/icons
+      - cp -r assets/thumbs assets/icons /app/share/open-image-tracer/assets/
+      - cp -r assets/icons/hicolor /app/share/icons/
+      - install -Dm755 flatpak/open-image-tracer.sh /app/bin/open-image-tracer
+      - install -Dm644 flatpak/io.github.sabaoongfx.OpenImageTracer.desktop
+        /app/share/applications/io.github.sabaoongfx.OpenImageTracer.desktop
+      - install -Dm644 flatpak/io.github.sabaoongfx.OpenImageTracer.metainfo.xml
+        /app/share/metainfo/io.github.sabaoongfx.OpenImageTracer.metainfo.xml
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .git
+          - tests
+          - tools
+          - __pycache__
+          - assets/samples

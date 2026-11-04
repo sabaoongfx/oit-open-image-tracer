@@ -23,7 +23,7 @@ import trace_engine as te  # noqa: E402
 
 log = logging.getLogger("image_tracer")
 
-APP_ID = "local.imagetracer"  # also the icon name and .desktop file name
+APP_ID = "io.github.sabaoongfx.OpenImageTracer"  # icon, .desktop and Flatpak id
 HERE = os.path.dirname(os.path.abspath(__file__))
 THUMB_DIR = os.path.join(HERE, "assets", "thumbs")
 ICON_DIR = os.path.join(HERE, "assets", "icons")  # hicolor theme with APP_ID icons

@@ -14,7 +14,9 @@ UPDATE_GOLDEN=1 python3 -m unittest discover -s tests   # only after an intended
 python3 tools/make_thumbs.py                     # after editing presets.py / modes
 python3 tools/gradient_trace.py in.png out.svg   # gradient vectorizer (logos/icons)
 python3 tools/make_app_icon.py                   # icon set from assets/icon-source.png
-python3 tools/install_desktop.py [--uninstall]   # user launcher + icon (APP_ID local.imagetracer)
+python3 tools/install_desktop.py [--uninstall]   # native user launcher + icon
+flatpak run org.flatpak.Builder --user --install --force-clean build-dir flatpak/io.github.sabaoongfx.OpenImageTracer.yml
+                                                 # build + install the Flatpak (see flatpak/)
 ```
 
 ## Architecture (single sources of truth)
@@ -31,6 +33,14 @@ python3 tools/install_desktop.py [--uninstall]   # user launcher + icon (APP_ID 
   go through that dict. Programmatic changes go inside `with self.quiet():`.
   One `TraceWorker` thread; new requests cancel the running trace.
 - `centerline.py` — Line drawing mode (returns `trace_engine.Contour`).
+
+## App id and packaging
+
+`APP_ID = "io.github.sabaoongfx.OpenImageTracer"` (Flatpak needs 3+ parts) names
+the icon files, the .desktop file and the Flatpak. The Flatpak (GNOME 51
+runtime) bundles potrace, leptonica + tesseract + tessdata `eng` (identical to
+the system's), numpy and Pillow; AI upscalers on the host are not reachable
+from the sandbox. Files are opened/saved through portals (no filesystem access).
 
 ## Conventions
 

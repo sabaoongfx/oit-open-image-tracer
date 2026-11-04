@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Image Tracer
+GenericName=Image to SVG Converter
+Comment=Convert images (PNG, JPEG, …) into SVG vectors
+Exec=open-image-tracer %f
+Icon=io.github.sabaoongfx.OpenImageTracer
+Terminal=false
+Categories=Graphics;2DGraphics;VectorGraphics;
+Keywords=svg;vector;trace;vectorize;potrace;convert;
+MimeType=image/png;image/jpeg;image/bmp;image/gif;image/tiff;image/webp;
+StartupNotify=true

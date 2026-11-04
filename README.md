@@ -14,7 +14,24 @@ python3 image_tracer.py [image]
 **Simple** shows only presets and modes; **Advanced** shows every setting.
 Each slider has a field next to it for typing exact values.
 
-## Install the app icon and launcher
+## Flatpak
+
+Build and install for your user (needs `flatpak` and Flathub; the builder and
+GNOME 51 runtime are installed per user, no root):
+
+```sh
+flatpak install --user flathub org.flatpak.Builder org.gnome.Sdk//51
+flatpak run org.flatpak.Builder --user --install --force-clean \
+    ~/.cache/oit-flatpak/build flatpak/io.github.sabaoongfx.OpenImageTracer.yml
+flatpak run io.github.sabaoongfx.OpenImageTracer
+```
+
+The Flatpak bundles potrace, Tesseract with English OCR data, NumPy and Pillow.
+It has no file-system or network access: images are opened and SVGs saved
+through the standard file dialogs. AI upscalers installed on the host are not
+available inside it.
+
+## Install the app icon and launcher (running from source)
 
 ```sh
 python3 tools/install_desktop.py            # menu entry + icon for your user (no root)

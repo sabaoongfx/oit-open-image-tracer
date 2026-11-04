@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sabaoongfx.OpenImageTracer</id>
+  <name>Image Tracer</name>
+  <summary>Convert images into SVG vectors</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <developer id="io.github.sabaoongfx">
+    <name>Sabaoon</name>
+  </developer>
+  <description>
+    <p>
+      Image Tracer turns bitmaps (PNG, JPEG, …) into scalable SVG vectors.
+      Pick a preset for logos, screenshots or line art, or fine-tune every
+      setting in Advanced mode, and compare the result side by side with the
+      original.
+    </p>
+    <ul>
+      <li>Full color, black &amp; white, grayscale, outlines, posterize and line drawing modes</li>
+      <li>Screenshot mode with crisp small text, optionally recognized as real, editable SVG text (OCR)</li>
+      <li>Perceptual color palettes, JPEG noise removal and fixed palettes</li>
+      <li>Compact SVG output with gap-free shapes</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.sabaoongfx.OpenImageTracer.desktop</launchable>
+  <url type="homepage">https://github.com/sabaoongfx/oit-open-image-tracer</url>
+  <url type="bugtracker">https://github.com/sabaoongfx/oit-open-image-tracer/issues</url>
+  <content_rating type="oars-1.1"/>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-11-04"/>
+  </releases>
+</component>
