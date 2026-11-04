@@ -1,0 +1,206 @@
+{
+ "mode_multi_colors": {
+  "colors": [
+   "#9fd8ff",
+   "#6cc04a",
+   "#e94f37",
+   "#000000",
+   "#5b3a29",
+   "#ffd23f",
+   "#2e9e4f",
+   "#8b5a2b"
+  ],
+  "paths": 12,
+  "nodes": 237,
+  "texts": []
+ },
+ "mode_brightness": {
+  "colors": [
+   "#000000"
+  ],
+  "paths": 21,
+  "nodes": 245,
+  "texts": []
+ },
+ "mode_centerline": {
+  "colors": [
+   "#5b3a29"
+  ],
+  "paths": 62,
+  "nodes": 139,
+  "texts": []
+ },
+ "mode_edge": {
+  "colors": [
+   "#000000"
+  ],
+  "paths": 22,
+  "nodes": 327,
+  "texts": []
+ },
+ "mode_multi_grays": {
+  "colors": [
+   "#cbcbcb",
+   "#999999",
+   "#7a7a7a",
+   "#000000",
+   "#424242",
+   "#2f2f2f",
+   "#e6e6e6",
+   "#5b5b5b"
+  ],
+  "paths": 16,
+  "nodes": 313,
+  "texts": []
+ },
+ "mode_multi_brightness": {
+  "colors": [
+   "#d4d4d4",
+   "#b8b8b8",
+   "#9c9c9c",
+   "#808080",
+   "#636363",
+   "#474747",
+   "#2a2a2a",
+   "#0e0e0e"
+  ],
+  "paths": 73,
+  "nodes": 1816,
+  "texts": []
+ },
+ "mode_quant": {
+  "colors": [
+   "#000000"
+  ],
+  "paths": 4,
+  "nodes": 74,
+  "texts": []
+ },
+ "preset_logo": {
+  "colors": [
+   "#2d6cdf",
+   "#ffffff",
+   "#ffb400"
+  ],
+  "paths": 3,
+  "nodes": 58,
+  "texts": []
+ },
+ "preset_screenshot": {
+  "colors": [
+   "#191919",
+   "#1f2533",
+   "#0b2d5c",
+   "#2b2b2b",
+   "#1b1f24",
+   "#131313",
+   "#122b4f",
+   "#131f35",
+   "#d9d9d9",
+   "#a4a4a4",
+   "#111725",
+   "#e8e8e8",
+   "#2a6ddf",
+   "#c8cedc",
+   "#3f3f3f",
+   "#1c171a",
+   "#262c3a",
+   "#ea313a",
+   "#535967",
+   "#1c171c",
+   "#071d45",
+   "#edf3ff",
+   "#919191",
+   "#191a13",
+   "#515151",
+   "#848484",
+   "#656565",
+   "#919cac",
+   "#13243d",
+   "#070917",
+   "#2e6be0",
+   "#9aa0ae",
+   "#2b6fd6",
+   "#a5bcdd",
+   "#232d36",
+   "#2a2c26",
+   "#1e446d",
+   "#467a85",
+   "#737987",
+   "#284666",
+   "#5d7794",
+   "#6698a6",
+   "#9ab0ce",
+   "#dc3e38",
+   "#244d7b",
+   "#415e81",
+   "#486b77",
+   "#326abf",
+   "#cce5fe",
+   "#205e6b",
+   "#00223a",
+   "#7495c2",
+   "#033e56",
+   "#6096ae",
+   "#2b0d08",
+   "#c1433b",
+   "#79272b",
+   "#326a80",
+   "#400f03",
+   "#882319",
+   "#b24743",
+   "#164a5e",
+   "#70a5a8",
+   "#6da2bc"
+  ],
+  "paths": 1210,
+  "nodes": 12951,
+  "texts": []
+ },
+ "preset_line-art": {
+  "colors": [
+   "#020202"
+  ],
+  "paths": 27,
+  "nodes": 116,
+  "texts": []
+ },
+ "palette": {
+  "colors": [
+   "#2d6cdf",
+   "#ffffff"
+  ],
+  "paths": 3,
+  "nodes": 53,
+  "texts": []
+ },
+ "remove_background": {
+  "colors": [
+   "#6cc04a",
+   "#e94f37",
+   "#000000",
+   "#5b3a29",
+   "#ffd23f",
+   "#2e9e4f",
+   "#8b5a2b"
+  ],
+  "paths": 11,
+  "nodes": 185,
+  "texts": []
+ },
+ "no_stack": {
+  "colors": [
+   "#9fd8ff",
+   "#6cc04a",
+   "#e94f37",
+   "#000000",
+   "#5b3a29",
+   "#ffd23f",
+   "#2e9e4f",
+   "#8b5a2b"
+  ],
+  "paths": 19,
+  "nodes": 230,
+  "texts": []
+ }
+}

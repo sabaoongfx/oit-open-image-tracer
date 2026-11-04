@@ -18,7 +18,7 @@ sys.path.insert(0, ROOT)
 
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
-import image_tracer as app  # noqa: E402  (MODES / PRESETS / PRESET_FIELDS)
+import presets as P  # noqa: E402
 import trace_engine as te  # noqa: E402
 
 SAMPLES = os.path.join(ROOT, "assets", "samples")
@@ -67,7 +67,7 @@ def logo() -> Image.Image:
 
 
 def ui() -> Image.Image:
-    """Small dark app window with text, saved as JPEG like a real screenshot."""
+    """Small dark app window with text (saved as JPEG, like a real screenshot)."""
     k = 2
     im = Image.new("RGB", (W * k, H * k), "#191919")
     d = ImageDraw.Draw(im)
@@ -91,10 +91,7 @@ def ui() -> Image.Image:
         d.rectangle((56 * k, y, 70 * k, y + 14 * k), fill="#e93233" if i % 2 else "#2d6cdf")
         d.text((78 * k, y), name, font=f, fill="#ffffff")
         d.text((250 * k, y), val, font=f, fill="#ffffff")
-    im = im.resize((W, H), Image.LANCZOS)
-    path = os.path.join(SAMPLES, "ui.jpg")
-    im.save(path, quality=82)
-    return Image.open(path).convert("RGB")
+    return im.resize((W, H), Image.LANCZOS)
 
 
 def sketch() -> Image.Image:
@@ -130,44 +127,46 @@ def render(result: te.TraceResult, name: str):
 
 
 def save_sample(img, name):
+    """Save a sample (JPEG for screenshots, so it has real compression noise)
+    and reload it the way the app would."""
     p = os.path.join(SAMPLES, name)
-    img.save(p)
+    img.save(p, **({"quality": 82} if name.endswith(".jpg") else {}))
     return te.load_image(p)
+
+
+# Per-mode settings that make the shared cartoon sample look its best.
+MODE_SAMPLE_OPTIONS = {
+    "multi_colors": dict(scans=8),
+    "brightness": dict(threshold=0.45),
+    "centerline": dict(threshold=0.1),  # only the black outlines count as ink
+    "edge": dict(threshold=0.3),
+    "multi_grays": dict(scans=6),
+    "multi_brightness": dict(scans=4),
+    "quant": dict(quant_colors=6),
+}
+# Per-sample overrides for preset thumbnails.
+PRESET_SAMPLE_OPTIONS = {"sketch": dict(threshold=0.5)}
 
 
 def main():
     os.makedirs(SAMPLES, exist_ok=True)
     os.makedirs(THUMBS, exist_ok=True)
-    car = save_sample(cartoon(), "cartoon.png")
+    cartoon_img = save_sample(cartoon(), "cartoon.png")
     samples = {
         "logo": save_sample(logo(), "logo.png"),
-        "ui": te.load_image(os.path.join(SAMPLES, "ui.jpg")) if ui() else None,
+        "ui": save_sample(ui(), "ui.jpg"),
         "sketch": save_sample(sketch(), "sketch.png"),
     }
 
-    mode_opts = {
-        "multi_colors": dict(scans=8),
-        "brightness": dict(threshold=0.45),
-        "centerline": dict(threshold=0.1),
-        "edge": dict(threshold=0.3),
-        "multi_grays": dict(scans=6),
-        "multi_brightness": dict(scans=4),
-        "quant": dict(quant_colors=6),
-    }
-    for mid, _name, _hint in app.MODES:
-        r = te.trace(car, te.TraceOptions(mode=mid, **mode_opts.get(mid, {})))
-        render(r, f"mode_{mid}")
+    for m in P.MODES:
+        r = te.trace(cartoon_img, te.TraceOptions(mode=m.id, **MODE_SAMPLE_OPTIONS.get(m.id, {})))
+        render(r, f"mode_{m.id}")
 
-    preset_sample = {"Logo / illustration": "logo", "Screenshot / UI": "ui",
-                     "Line art (centerline)": "sketch", "Screenshot + OCR text": "ui"}
-    for i, (name, p) in enumerate(app.PRESETS.items()):
-        opts = te.TraceOptions(**{app.PRESET_FIELDS[k]: v for k, v in p.items()})
-        if p["mode"] == "centerline":
-            opts.threshold = 0.5
-        r = te.trace(samples[preset_sample.get(name, "logo")], opts)
-        render(r, f"preset_{i}")
-        if p.get("ocr"):
-            badge(os.path.join(THUMBS, f"preset_{i}.png"), "Aa")
+    for p in P.PRESETS:
+        opts = te.TraceOptions(**{**p.options, **PRESET_SAMPLE_OPTIONS.get(p.sample, {})})
+        render(te.trace(samples[p.sample], opts), f"preset_{p.slug}")
+        if p.options.get("ocr"):
+            badge(os.path.join(THUMBS, f"preset_{p.slug}.png"), "Aa")
 
 
 def badge(path, text):

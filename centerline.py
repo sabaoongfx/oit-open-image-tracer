@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from trace_engine import Contour
+
 _N8 = [(-1, 0), (0, 1), (1, 0), (0, -1), (-1, 1), (1, 1), (1, -1), (-1, -1)]  # 4-nbrs first
 
 
@@ -135,7 +137,7 @@ def _to_beziers(pts: np.ndarray, closed: bool, corner_deg: float = 55.0):
 def trace_centerline(mask: np.ndarray, scale: int = 1, min_length: float = 3.0,
                      simplify: float = 0.6):
     """Return (contours, stroke_width) in original-image coordinates.
-    Each contour: ((x0, y0), segments, closed)."""
+    Each contour is a trace_engine.Contour (open unless it is a loop)."""
     sk = thin(mask)
     if not sk.any():
         return [], 1.0
@@ -164,8 +166,7 @@ def trace_centerline(mask: np.ndarray, scale: int = 1, min_length: float = 3.0,
                     cluster[ny, nx] = cid
                     stack.append((ny, nx))
         m = np.array(members, float)
-        centroids.append((m[:, 1].mean(), m[:, 0].mean(), len(members),
-                          int(cnt[members[0]]) if len(members) == 1 else 3))
+        centroids.append((m[:, 1].mean(), m[:, 0].mean()))  # (x, y)
 
     visited = np.zeros(sk.shape, bool)
     edges = []  # (cluster_a, cluster_b, [(x,y),...])
@@ -231,9 +232,9 @@ def trace_centerline(mask: np.ndarray, scale: int = 1, min_length: float = 3.0,
     def full(e):
         pts = list(e[2])
         if e[0] >= 0:
-            pts.insert(0, centroids[e[0]][:2])
+            pts.insert(0, centroids[e[0]])
         if e[1] >= 0:
-            pts.append(centroids[e[1]][:2])
+            pts.append(centroids[e[1]])
         return pts
 
     paths = [[e[0], e[1], full(e)] for e in edges]
@@ -286,4 +287,4 @@ def _finish(pts, closed, scale, simplify):
     k = 1.0 / scale
     pts = pts * k
     segs = _to_beziers(pts, closed)
-    return ((pts[0][0], pts[0][1]), segs, closed)
+    return Contour((pts[0][0], pts[0][1]), segs, closed)
