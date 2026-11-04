@@ -49,7 +49,15 @@ spec (AppImage/Windows/macOS), per-format build scripts, NSIS + WiX installers.
 `.github/workflows/release.yml` builds all formats on CI, runs `--self-test` on
 each (artifacts `self-test-*` contain a window picture to inspect), and on a
 `v*` tag creates a draft release. Version lives in `VERSION` (+ PKGBUILD, spec,
-metainfo). Releases: v0.1.0 = Flatpak only; v0.1.1 = all formats.
+metainfo). Releases: v0.1.0 = Flatpak only (published).
+
+Status (paused 2026-11-04, user said "we will run later" - don't start CI or
+tag without being asked): CI run 41874432638 passed deb, rpm, pacman, Flatpak,
+AppImage, Windows and macOS Intel self-tests (OCR working everywhere). macOS
+arm64 never got a runner (GitHub capacity) and was cancelled; in the previous
+run it built and ran fine. Next: rerun/verify macOS arm64, then tag v0.1.1
+(VERSION already 0.1.1) to create the draft release with all formats, check
+the assets, publish.
 
 ## License and Flathub
 
