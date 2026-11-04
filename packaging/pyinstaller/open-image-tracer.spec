@@ -22,6 +22,10 @@ datas = [
 if os.environ.get("TESSERACT"):
     binaries.append((os.environ["TESSERACT"], "."))
     datas.append((os.path.join(os.environ["TESSDATA"], "eng.traineddata"), "tessdata"))
+    # output formats such as "tsv" are config files next to the models
+    for sub in ("configs", "tessconfigs"):
+        if os.path.isdir(os.path.join(os.environ["TESSDATA"], sub)):
+            datas.append((os.path.join(os.environ["TESSDATA"], sub), os.path.join("tessdata", sub)))
 
 a = Analysis(
     [os.path.join(ROOT, "image_tracer.py")],

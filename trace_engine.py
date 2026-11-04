@@ -754,8 +754,8 @@ def _run_tesseract(gray: Image.Image, factor: int) -> list[OcrWord]:
                               capture_output=True, text=True, timeout=120, env=_tesseract_env())
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    if proc.returncode != 0:
-        log.warning("tesseract failed: %s", proc.stderr.strip()[-200:])
+    if proc.returncode != 0 or (proc.stderr.strip() and not proc.stdout.strip()):
+        log.warning("tesseract failed: %s", proc.stderr.strip()[-300:])
     words = []
     for line in proc.stdout.splitlines()[1:]:
         cols = line.split("\t")

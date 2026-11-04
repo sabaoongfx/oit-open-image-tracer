@@ -14,22 +14,49 @@ python3 image_tracer.py [image]
 **Simple** shows only presets and modes; **Advanced** shows every setting.
 Each slider has a field next to it for typing exact values.
 
-## Flatpak
+## Download
 
-Build and install for your user (needs `flatpak` and Flathub; the builder and
-GNOME 51 runtime are installed per user, no root):
+Every release on the
+[Releases page](https://github.com/sabaoongfx/oit-open-image-tracer/releases)
+has these packages (the latest version is always at
+`https://github.com/sabaoongfx/oit-open-image-tracer/releases/latest/download/<name>`):
+
+| System | File | Install |
+|---|---|---|
+| Any Linux (Flatpak) | `Open-Image-Tracer-x86_64.flatpak` | `flatpak install --user Open-Image-Tracer-x86_64.flatpak` |
+| Any Linux (AppImage) | `Open-Image-Tracer-x86_64.AppImage` | `chmod +x` it and run it |
+| Debian 13+ / Ubuntu 24.04+ | `Open-Image-Tracer-all.deb` | `sudo apt install ./Open-Image-Tracer-all.deb` |
+| Fedora | `Open-Image-Tracer-noarch.rpm` | `sudo dnf install ./Open-Image-Tracer-noarch.rpm` |
+| Arch / Manjaro | `Open-Image-Tracer-any.pkg.tar.zst` | `sudo pacman -U Open-Image-Tracer-any.pkg.tar.zst` |
+| Windows 10/11 | `Open-Image-Tracer-x64-setup.exe` or `.msi` | run the installer |
+| macOS (Apple Silicon / Intel) | `Open-Image-Tracer-aarch64.dmg` / `-x64.dmg` | open, drag to Applications (unsigned: right-click → Open the first time) |
+
+`SHA256SUMS` lists the checksums.
+
+## Packaging and releases
+
+All packaging lives in `packaging/`: a shared Linux install script
+(`packaging/linux/install.sh`) used by the .deb, .rpm, pacman and Flatpak
+builds; a PyInstaller spec shared by the AppImage, Windows and macOS builds;
+and per-format build scripts. `.github/workflows/release.yml` builds every
+format, installs/runs each one with `--self-test` (traces a sample with OCR
+and saves a picture of the window), and on a `v*` tag matching `VERSION`
+attaches everything to a draft release.
+
+To release: bump `VERSION`, `pkgver` in `packaging/arch/PKGBUILD`, `Version`
+in `packaging/rpm/open-image-tracer.spec` and add a `<release>` to the
+metainfo; commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`, review the
+draft release and publish it.
+
+Build the Flatpak locally:
 
 ```sh
 flatpak install --user flathub org.flatpak.Builder org.gnome.Sdk//51
 flatpak run org.flatpak.Builder --user --install --force-clean \
-    ~/.cache/oit-flatpak/build flatpak/io.github.sabaoongfx.OpenImageTracer.yml
-flatpak run io.github.sabaoongfx.OpenImageTracer
+    ~/.cache/oit-flatpak/build packaging/flatpak/io.github.sabaoongfx.OpenImageTracer.yml
 ```
 
-The Flatpak bundles potrace, Tesseract with English OCR data, NumPy and Pillow.
-It has no file-system or network access: images are opened and SVGs saved
-through the standard file dialogs. AI upscalers installed on the host are not
-available inside it.
+`python3 image_tracer.py --self-test OUTDIR` checks any installation.
 
 ## Install the app icon and launcher (running from source)
 

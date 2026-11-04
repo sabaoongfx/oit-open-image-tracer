@@ -15,8 +15,8 @@ python3 tools/make_thumbs.py                     # after editing presets.py / mo
 python3 tools/gradient_trace.py in.png out.svg   # gradient vectorizer (logos/icons)
 python3 tools/make_app_icon.py                   # icon set from assets/icon-source.png
 python3 tools/install_desktop.py [--uninstall]   # native user launcher + icon
-flatpak run org.flatpak.Builder --user --install --force-clean build-dir flatpak/io.github.sabaoongfx.OpenImageTracer.yml
-                                                 # build + install the Flatpak (see flatpak/)
+flatpak run org.flatpak.Builder --user --install --force-clean ~/.cache/oit-flatpak/build packaging/flatpak/io.github.sabaoongfx.OpenImageTracer.yml
+python3 image_tracer.py --self-test OUTDIR      # window picture + OCR check of any install
 ```
 
 ## Architecture (single sources of truth)
@@ -42,6 +42,15 @@ runtime) bundles potrace, leptonica + tesseract + tessdata `eng` (identical to
 the system's), numpy and Pillow; AI upscalers on the host are not reachable
 from the sandbox. Files are opened/saved through portals (no filesystem access).
 
+## Packaging
+
+`packaging/`: `linux/install.sh` (shared by deb/rpm/pacman/Flatpak), `pyinstaller/`
+spec (AppImage/Windows/macOS), per-format build scripts, NSIS + WiX installers.
+`.github/workflows/release.yml` builds all formats on CI, runs `--self-test` on
+each (artifacts `self-test-*` contain a window picture to inspect), and on a
+`v*` tag creates a draft release. Version lives in `VERSION` (+ PKGBUILD, spec,
+metainfo). Releases: v0.1.0 = Flatpak only; v0.1.1 = all formats.
+
 ## License and Flathub
 
 License: GPL-3.0-or-later (LICENSE, SPDX headers in every .py, metainfo
@@ -52,7 +61,7 @@ policy): AI tools must not open or automate submission PRs or write their
 text/replies, and Flathub manifests must not contain AI-generated or
 AI-assisted content; AI-generated app code must be disclosed. So never open a
 Flathub PR or write a manifest meant for Flathub submission. The manifest in
-flatpak/ is for local builds only. For a submission the ID would also have to
+packaging/flatpak/ is for local builds only. For a submission the ID would also have to
 match the repo: io.github.sabaoongfx.oit-open-image-tracer.
 
 ## Conventions
