@@ -1,0 +1,247 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Builds every package format, installs/runs each one with `--self-test`
+# (window picture + OCR check, uploaded as artifacts), and on a v* tag attaches
+# everything to a draft GitHub release. Run manually (workflow_dispatch) to
+# build and test without releasing.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  GSK_RENDERER: cairo   # no GPU on CI runners
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          v=$(cat VERSION)
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$v" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match VERSION $v" >&2; exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+  deb:
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: packaging/deb/build-deb.sh dist
+      - name: Install and self-test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ./dist/*.deb tesseract-ocr tesseract-ocr-eng xvfb
+          xvfb-run -a open-image-tracer --self-test self-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: self-test-deb, path: self-test}
+      - uses: actions/upload-artifact@v4
+        with: {name: pkg-deb, path: dist/*.deb}
+
+  rpm:
+    needs: version
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - run: dnf install -y rpm-build tar gzip
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          v=$(cat VERSION)
+          mkdir -p ~/rpmbuild/SOURCES
+          tar czf ~/rpmbuild/SOURCES/open-image-tracer-$v.tar.gz --exclude=./.git \
+              --transform "s,^\.,oit-open-image-tracer-$v," .
+          sed -i "s/^Version:.*/Version:        $v/" packaging/rpm/open-image-tracer.spec
+          rpmbuild -bb packaging/rpm/open-image-tracer.spec
+          mkdir dist && cp ~/rpmbuild/RPMS/noarch/*.rpm dist/
+      - name: Install and self-test
+        run: |
+          dnf install -y ./dist/*.rpm tesseract tesseract-langpack-eng xorg-x11-server-Xvfb xorg-x11-xauth which
+          xvfb-run -a open-image-tracer --self-test self-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: self-test-rpm, path: self-test}
+      - uses: actions/upload-artifact@v4
+        with: {name: pkg-rpm, path: dist/*.rpm}
+
+  pacman:
+    needs: version
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - run: pacman -Syu --noconfirm --needed git tar
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          v=$(cat VERSION)
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          mkdir /build
+          tar czf /build/open-image-tracer-$v.tar.gz --exclude=./.git \
+              --transform "s,^\.,oit-open-image-tracer-$v," .
+          sed -e "s/^pkgver=.*/pkgver=$v/" \
+              -e "s|^source=.*|source=(\"open-image-tracer-$v.tar.gz\")|" \
+              packaging/arch/PKGBUILD > /build/PKGBUILD
+          chown -R builder /build
+          cd /build && sudo -u builder env PACKAGER="Sabaoon" makepkg --syncdeps --noconfirm
+          mkdir -p "$GITHUB_WORKSPACE/dist" && cp /build/*.pkg.tar.zst "$GITHUB_WORKSPACE/dist/"
+      - name: Install and self-test
+        run: |
+          pacman -U --noconfirm dist/*.pkg.tar.zst
+          pacman -S --noconfirm --needed tesseract tesseract-data-eng xorg-server-xvfb xorg-xauth
+          xvfb-run -a open-image-tracer --self-test self-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: self-test-pacman, path: self-test}
+      - uses: actions/upload-artifact@v4
+        with: {name: pkg-pacman, path: dist/*.pkg.tar.zst}
+
+  flatpak:
+    needs: version
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: Open-Image-Tracer-${{ needs.version.outputs.version }}-x86_64.flatpak
+          manifest-path: packaging/flatpak/io.github.sabaoongfx.OpenImageTracer.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: false
+      - uses: actions/upload-artifact@v4
+        with: {name: pkg-flatpak, path: '*.flatpak'}
+
+  appimage:
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-4.0 python3-numpy \
+              python3-pil python3-pip libpotrace0 tesseract-ocr tesseract-ocr-eng xvfb
+          python3 -m pip install --break-system-packages pyinstaller
+      - name: Build
+        run: packaging/appimage/build-appimage.sh dist
+      - name: Self-test
+        run: APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a dist/*.AppImage --self-test self-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: self-test-appimage, path: self-test}
+      - uses: actions/upload-artifact@v4
+        with: {name: pkg-appimage, path: dist/*.AppImage}
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-python-cairo
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-adwaita-icon-theme
+            mingw-w64-ucrt-x86_64-python-numpy
+            mingw-w64-ucrt-x86_64-python-pillow
+            mingw-w64-ucrt-x86_64-potrace
+            mingw-w64-ucrt-x86_64-tesseract-ocr
+            mingw-w64-ucrt-x86_64-tesseract-data-eng
+            mingw-w64-ucrt-x86_64-pyinstaller
+            mingw-w64-ucrt-x86_64-nsis
+      - name: Build bundle and NSIS installer
+        shell: msys2 {0}
+        run: packaging/windows/build.sh dist
+      - name: Self-test
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "build\windows\dist\open-image-tracer\open-image-tracer.exe" `
+               -ArgumentList "--self-test", "self-test" -Wait -PassThru
+          Get-Content self-test\self-test.txt
+          exit $p.ExitCode
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          $v = Get-Content VERSION
+          wix build packaging\windows\installer.wxs -arch x64 `
+              -d Version=$v -d Source=build\windows\dist\open-image-tracer `
+              -d Icon=build\windows\app.ico -o "dist\Open-Image-Tracer-$v-x64.msi"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: self-test-windows, path: self-test}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg-windows
+          path: |
+            dist/*.exe
+            dist/*.msi
+
+  macos:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: brew install gtk4 pygobject3 numpy pillow potrace tesseract adwaita-icon-theme
+      - name: Build app and dmg
+        run: packaging/macos/build.sh dist
+      - name: Self-test
+        run: '"build/macos/dist/Image Tracer.app/Contents/MacOS/open-image-tracer" --self-test self-test'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: 'self-test-${{ matrix.runner }}', path: self-test}
+      - uses: actions/upload-artifact@v4
+        with: {name: 'pkg-${{ matrix.runner }}', path: dist/*.dmg}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [version, deb, rpm, pacman, flatpak, appimage, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {pattern: 'pkg-*', path: dist, merge-multiple: true}
+      - name: Versionless copies and checksums
+        run: |
+          cd dist
+          v=${{ needs.version.outputs.version }}
+          # stable names for .../releases/latest/download/<name>
+          cp Open-Image-Tracer-$v-x86_64.flatpak Open-Image-Tracer-x86_64.flatpak
+          cp Open-Image-Tracer-$v-x86_64.AppImage Open-Image-Tracer-x86_64.AppImage
+          cp open-image-tracer_${v}_all.deb Open-Image-Tracer-all.deb
+          cp open-image-tracer-$v-*.noarch.rpm Open-Image-Tracer-noarch.rpm
+          cp open-image-tracer-$v-*-any.pkg.tar.zst Open-Image-Tracer-any.pkg.tar.zst
+          cp Open-Image-Tracer-$v-x64-setup.exe Open-Image-Tracer-x64-setup.exe
+          cp Open-Image-Tracer-$v-x64.msi Open-Image-Tracer-x64.msi
+          cp Open-Image-Tracer-$v-aarch64.dmg Open-Image-Tracer-aarch64.dmg
+          cp Open-Image-Tracer-$v-x64.dmg Open-Image-Tracer-x64.dmg
+          sha256sum * > SHA256SUMS
+          ls -l
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --draft \
+              --title "Image Tracer ${{ needs.version.outputs.version }}" \
+              --notes "See the assets below to download and install this version."

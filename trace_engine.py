@@ -120,10 +120,11 @@ _lib = _load_potrace()
 def _tool(name: str) -> str | None:
     """Path of an external tool: bundled copy first, then PATH."""
     if BUNDLE_DIR:
-        for cand in (name, name + ".exe"):
-            p = os.path.join(BUNDLE_DIR, "bin", cand)
-            if os.path.isfile(p):
-                return p
+        for sub in ("", "bin"):  # Windows needs tools next to their DLLs (bundle root)
+            for cand in (name, name + ".exe"):
+                p = os.path.join(BUNDLE_DIR, sub, cand)
+                if os.path.isfile(p):
+                    return p
     return shutil.which(name)
 
 

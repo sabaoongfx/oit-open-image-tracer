@@ -34,6 +34,11 @@
     <control>keyboard</control>
   </supports>
   <releases>
+    <release version="0.1.1" date="2026-11-04">
+      <description>
+        <p>Native packages for Debian/Ubuntu, Fedora and Arch, an AppImage, and Windows and macOS installers.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-11-04"/>
   </releases>
 </component>
