@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Bitmap -> vector tracing engine (libpotrace via ctypes).
 
 Modes (ids used by the GUI and presets):

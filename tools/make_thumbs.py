@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Generate the predefined example thumbnails shown on the Mode and Preset
 buttons. Draws small sample images, traces them with our own engine and
 renders the SVG results to PNG (2x for HiDPI).

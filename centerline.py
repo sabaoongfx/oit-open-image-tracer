@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Centerline tracing: line art -> single stroked paths (like Autotrace's
 centerline mode / Inkscape's "Centerline tracing").
 

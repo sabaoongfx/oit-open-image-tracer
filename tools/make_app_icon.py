@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Build the app icon set from assets/icon-source.* (PNG or JPEG).
 
 The background (taken from the corners) becomes transparent:

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Gradient-aware vectorizer for logos and illustrations.
 
 Instead of slicing an image into flat color bands, it finds regions bounded by

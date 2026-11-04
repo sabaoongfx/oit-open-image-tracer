@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Regression tests. Run from the project folder:
 
     python3 -m unittest discover -s tests -v

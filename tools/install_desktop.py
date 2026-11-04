@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Install (or remove) the app icon and a launcher entry for the current user.
 
 Puts the icons from assets/icons/hicolor into ~/.local/share/icons/hicolor and

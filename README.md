@@ -80,3 +80,11 @@ Edit `presets.py`, then regenerate the thumbnails:
 ```sh
 python3 tools/make_thumbs.py
 ```
+
+## License
+
+Image Tracer is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See [LICENSE](LICENSE). It uses potrace (GPL-2.0-or-later) and
+Tesseract (Apache-2.0).

@@ -42,6 +42,19 @@ runtime) bundles potrace, leptonica + tesseract + tessdata `eng` (identical to
 the system's), numpy and Pillow; AI upscalers on the host are not reachable
 from the sandbox. Files are opened/saved through portals (no filesystem access).
 
+## License and Flathub
+
+License: GPL-3.0-or-later (LICENSE, SPDX headers in every .py, metainfo
+`project_license`). potrace is GPL-2.0-or-later, Tesseract Apache-2.0.
+
+Flathub's Generative AI policy (docs.flathub.org, Requirements → Inclusion
+policy): AI tools must not open or automate submission PRs or write their
+text/replies, and Flathub manifests must not contain AI-generated or
+AI-assisted content; AI-generated app code must be disclosed. So never open a
+Flathub PR or write a manifest meant for Flathub submission. The manifest in
+flatpak/ is for local builds only. For a submission the ID would also have to
+match the repo: io.github.sabaoongfx.oit-open-image-tracer.
+
 ## Conventions
 
 - Verify output changes visually: render with `rsvg-convert` and compare

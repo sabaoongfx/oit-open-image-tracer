@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Modes and presets: what the app offers, independent of the GUI toolkit.
 
 Used by the GUI (image_tracer.py) and by tools/make_thumbs.py. Every key in a
