@@ -22,8 +22,10 @@ import trace_engine as te  # noqa: E402
 
 EDGE = 3.5           # Lab change per pixel that counts as a hard edge
 MIN_REGION = 40      # px; smaller pieces are merged into a neighbour
-SMOOTH = 5           # px (odd) silhouette smoothing
-DETAIL_DIST = 60.0   # RGB distance from the region's colors that marks a lost detail
+GLOW_RIM = 9         # px (odd) next to a glow where glow-colored solid pixels join it
+GLOW_COLOR_DIST = 35.0  # RGB distance to the glow color for that
+GLOW_OBJECT_DIST = 80.0  # semi-transparent pixels this far from the glow color are objects
+DETAIL_DIST = 90.0   # RGB distance from the region's colors that marks a lost detail
 DETAIL_MIN = 6       # px; smallest recovered detail
 FLAT_RANGE = 10.0    # RGB change across a region below which it is flat
 SOLID_ALPHA = 128    # shape coverage threshold (anti-aliased edges are half-covered)
@@ -110,8 +112,11 @@ def _recover_details(lab, rgb, solid):
     off = solid & (np.sqrt(((rgb - pred) ** 2).sum(-1)) > DETAIL_DIST)
     comps = label_components(off)
     sizes = np.bincount(comps.ravel())
+    # A real detail has some thickness; 1-px slivers along region borders
+    # (anti-aliasing between two colors) vanish under a 3x3 erosion.
+    thick = np.bincount(comps[_filter(off, ImageFilter.MinFilter(3))], minlength=len(sizes))
     nxt = lab.max() + 1
-    for c in np.flatnonzero(sizes >= DETAIL_MIN):
+    for c in np.flatnonzero((sizes >= DETAIL_MIN) & (thick >= 3)):
         if c == 0:
             continue
         lab[comps == c] = nxt
@@ -163,10 +168,22 @@ def vectorize(path: str) -> str:
     core = _filter(semi, ImageFilter.MinFilter(GLOW_BAND))  # survives only in wide bands
     glow = semi & _filter(core, ImageFilter.MaxFilter(GLOW_BAND + 2))
     solid = (alpha >= SOLID_ALPHA) & ~glow
-    # Even out the silhouette: drop bumps / fill notches a few px deep (left by
-    # the soft transition from glow to object).
-    solid = _filter(_filter(solid, ImageFilter.MinFilter(SMOOTH)), ImageFilter.MaxFilter(SMOOTH))
-    solid = _filter(_filter(solid, ImageFilter.MaxFilter(SMOOTH)), ImageFilter.MinFilter(SMOOTH))
+    glow_color = None
+    if glow.any():
+        # The glow's inner edge is nearly opaque but still glow-colored; left in
+        # `solid` it would be merged into the object and fray its outline.
+        glow_color = np.median(rgb[glow & (alpha >= 100)], 0) if (glow & (alpha >= 100)).any() \
+            else np.median(rgb[glow], 0)
+        rim = solid & _filter(glow, ImageFilter.MaxFilter(GLOW_RIM))
+        like_glow = np.sqrt(((rgb.astype(np.float32) - glow_color) ** 2).sum(-1)) < GLOW_COLOR_DIST
+        # Objects reaching into the glow can be partly transparent too (e.g. an arc
+        # passing behind the glowing card); their strong own color tells them apart.
+        dist = np.sqrt(((rgb.astype(np.float32) - glow_color) ** 2).sum(-1))
+        objects = glow & (alpha >= SOLID_ALPHA) & (dist > GLOW_OBJECT_DIST)
+        glow &= ~objects
+        solid |= objects
+        glow |= rim & like_glow
+        solid &= ~(rim & like_glow)
 
     edges = edge_map(rgb) > EDGE
     labels = label_components(solid & ~edges)
@@ -194,12 +211,10 @@ def vectorize(path: str) -> str:
         shape = (glow & (alpha >= 128)) | (solid & near)
         glow_paths = te._trace_mask(shape, opts, 1)
         if glow_paths:
-            color = np.median(rgb[glow & (alpha >= 100)], 0) if (glow & (alpha >= 100)).any() \
-                else np.array([255, 255, 255])
             layer = te.Layer((0, 0, 0), glow_paths)
             defs.append('<filter id="glow" x="-20%" y="-20%" width="140%" height="140%">'
                         f'<feGaussianBlur stdDeviation="{GLOW_BLUR}"/></filter>')
-            body.append(f'<path fill="{te._hex(tuple(int(v) for v in color))}" '
+            body.append(f'<path fill="{te._hex(tuple(int(v) for v in glow_color))}" '
                         f'filter="url(#glow)" d="{layer.svg_d()}"/>')
     for k in order:
         own = lab == k

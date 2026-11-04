@@ -56,29 +56,27 @@ python3 tools/gradient_trace.py in.png out.svg   # experimental gradient vectori
 - Sliders with a typeable value field instead of +/- spin buttons.
 - Previews side by side: "Image" (left) and "Vector" (right), equal halves.
 
-## In progress: SVG of the user's logo (paused 2026-11-04)
+## Gradient vectorizer (tools/gradient_trace.py)
 
-Goal: a clean SVG of `~/Downloads/Open Image Tracer Logo.png` (1254², RGBA,
-gradients + soft lavender glow around the photo card). The user's own export
-from the app (`Open Image Tracer Logo.svg`, 1.9 MB) has banded gradients —
-don't overwrite it; write a new file next to it.
+Built for the user's logo (`~/Downloads/Open Image Tracer Logo.png`, gradients
++ soft glow). Delivered `~/Downloads/Open Image Tracer Logo (vector).svg`:
+48 KB, 53 paths, 32 linear gradients, mean color error 3.73 vs the PNG (the
+user's own banded 1.9 MB export: 4.08). Never overwrite the user's files.
 
-Approach: `tools/gradient_trace.py` (uncommitted) — edge-aware regions
-(Lab Sobel > `EDGE`), run-based connected components, per-region linear
-gradient fit (`<linearGradient>` with 6 stops) or flat fill, smart stacking via
-engine helpers, wide semi-transparent bands → one blurred glow shape.
+How it works: edge-aware regions (Lab Sobel > `EDGE` = 3.5; real gradients
+change ~0.2/px, edges are sharp steps), run-based connected components,
+per-region linear gradient (6 stops) or flat fill, `_recover_details` for
+hairlines (far from region color *and* ≥3 px thick), smart stacking via engine
+helpers. Glow = semi-transparent bands ≥ `GLOW_BAND` px wide (thin ones are
+anti-aliasing), plus glow-colored near-opaque rim pixels; strongly colored
+semi-transparent pixels in the band are objects (an arc passing behind the
+card). Rendered as one blurred shape at the bottom.
 
-State:
-- Best so far: `EDGE = 3.5`, *without* `SMOOTH` silhouette smoothing and
-  without `_recover_details` → 44 KB, 48 paths, 31 gradients, mean color error
-  3.82 (user's 1.9 MB SVG: 4.08).
-- Remaining flaws there: torn outer edge of the photo card's white border
-  (near-opaque lavender pixels between glow and border; the card itself is only
-  ~99% alpha) and the thin Bézier curve on the document stops short of its
-  square handles.
-- The last attempt (`SMOOTH` + `_recover_details`, currently in the file)
-  reconnected the curve but added edge speckles and a dotted border (299 paths)
-  — rework or remove both before continuing.
+Tried and rejected: silhouette open/close smoothing (bridges letter gaps),
+drawing the glow between "behind" and "front" regions (detection broke the glow).
 
-Next steps: fix those two flaws, save the final SVG beside the PNG, then offer
-to add gradient tracing to the app as a "Smooth gradients" option.
+Known limits: soft semi-transparent blends (arc fading into the glow, the
+border's lower edge) come out as slightly hard-edged lavender areas.
+
+Possible next step: offer it in the app as a "Smooth gradients" option for
+logos/illustrations (would need its own golden tests).
