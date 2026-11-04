@@ -179,12 +179,33 @@ jobs:
         run: |
           dotnet tool install --global wix --version 5.0.2
           $v = Get-Content VERSION
+          # absolute paths: WiX resolves relative ones from the .wxs folder
+          $src = (Resolve-Path build\windows\dist\open-image-tracer).Path
+          $ico = (Resolve-Path build\windows\app.ico).Path
+          $msi = "dist\Open-Image-Tracer-$v-x64.msi"
           wix build packaging\windows\installer.wxs -arch x64 `
-              -d Version=$v -d Source=build\windows\dist\open-image-tracer `
-              -d Icon=build\windows\app.ico -o "dist\Open-Image-Tracer-$v-x64.msi"
+              -d Version=$v -d Source=$src -d Icon=$ico -o $msi
+          $mb = [math]::Round((Get-Item $msi).Length / 1MB, 1)
+          Write-Host "MSI size: $mb MB"
+          if ($mb -lt 20) { throw "MSI is only $mb MB - the app files are missing" }
+      - name: Install MSI and self-test the installed app
+        shell: pwsh
+        run: |
+          $msi = (Resolve-Path dist\*.msi).Path
+          $p = Start-Process msiexec -ArgumentList "/i", "`"$msi`"", "/qn", "/l*v", "msi-install.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content msi-install.log -Tail 40; throw "msiexec failed: $($p.ExitCode)" }
+          $exe = "C:\Program Files\Image Tracer\open-image-tracer.exe"
+          if (-not (Test-Path $exe)) { throw "not installed: $exe" }
+          $t = Start-Process -FilePath $exe -ArgumentList "--self-test", "self-test-msi" -Wait -PassThru
+          Get-Content self-test-msi\self-test.txt
+          exit $t.ExitCode
       - uses: actions/upload-artifact@v4
         if: always()
-        with: {name: self-test-windows, path: self-test}
+        with:
+          name: self-test-windows
+          path: |
+            self-test
+            self-test-msi
       - uses: actions/upload-artifact@v4
         with:
           name: pkg-windows

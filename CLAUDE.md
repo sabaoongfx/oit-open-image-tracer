@@ -51,13 +51,12 @@ each (artifacts `self-test-*` contain a window picture to inspect), and on a
 `v*` tag creates a draft release. Version lives in `VERSION` (+ PKGBUILD, spec,
 metainfo). Releases: v0.1.0 = Flatpak only (published).
 
-Status (paused 2026-11-04, user said "we will run later" - don't start CI or
-tag without being asked): CI run 41874432638 passed deb, rpm, pacman, Flatpak,
-AppImage, Windows and macOS Intel self-tests (OCR working everywhere). macOS
-arm64 never got a runner (GitHub capacity) and was cancelled; in the previous
-run it built and ran fine. Next: rerun/verify macOS arm64, then tag v0.1.1
-(VERSION already 0.1.1) to create the draft release with all formats, check
-the assets, publish.
+v0.1.1 published 2026-11-04 with Flatpak, AppImage, deb, rpm, pacman, Windows
+setup.exe and macOS dmg (arm64 + Intel), all CI self-tested. Its .msi was broken
+(172 KB: WiX got a relative Source path) and was removed before publishing;
+the workflow now uses absolute paths, fails on a tiny MSI, and installs the MSI
+on the runner + self-tests the installed app. Next: run the workflow
+(workflow_dispatch) and attach the verified MSI to v0.1.1 (+ SHA256SUMS).
 
 ## License and Flathub
 
