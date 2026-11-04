@@ -446,7 +446,7 @@ class TracerWindow(Gtk.ApplicationWindow):
         self.canvas = Canvas()  # the vector result
         # Equal halves, so both previews are drawn at the same size.
         previews = Gtk.Box(homogeneous=True, vexpand=True)
-        previews.append(_titled("Original", self.orig_canvas))
+        previews.append(_titled("Image", self.orig_canvas))
         vector = _titled("Vector", self.canvas)
         vector.add_css_class("vector-pane")
         previews.append(vector)
