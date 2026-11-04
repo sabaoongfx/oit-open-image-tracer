@@ -12,6 +12,12 @@ import threading
 
 import gi
 
+# The title bar belongs to the operating system. Linux (KWin/Mutter) and macOS
+# already draw it once the app has no custom header bar, but GTK 4 on Windows
+# draws its own decorations unless told not to.
+if sys.platform == "win32":
+    os.environ.setdefault("GTK_CSD", "0")
+
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Pango", "1.0")

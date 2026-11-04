@@ -162,7 +162,9 @@ submission would also need the ID to match the repo
 - Sliders with a typeable value field instead of +/- spin buttons.
 - Previews side by side: "Image" (left) and "Vector" (right), equal halves.
 - No custom header bar: the OS draws the title bar (on KDE Wayland GTK then
-  uses server-side decorations; no `csd` class). Buttons live in a toolbar
+  uses server-side decorations; no `csd` class; on Windows `GTK_CSD=0` is set
+  at startup, since GTK 4 otherwise draws its own title bar there — seen in
+  the CI self-test picture). Buttons live in a toolbar
   row inside the window. Don't style the top of the window.
 - Tracing progress: `trace(..., progress=cb)` reports (fraction, label) per
   stage and per layer; the status row shows a gradient progress bar
