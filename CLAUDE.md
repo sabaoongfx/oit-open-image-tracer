@@ -161,6 +161,13 @@ submission would also need the ID to match the repo
   Gray steps, Posterize (hint under the grid).
 - Sliders with a typeable value field instead of +/- spin buttons.
 - Previews side by side: "Image" (left) and "Vector" (right), equal halves.
+- No custom header bar: the OS draws the title bar (on KDE Wayland GTK then
+  uses server-side decorations; no `csd` class). Buttons live in a toolbar
+  row inside the window. Don't style the top of the window.
+- Tracing progress: `trace(..., progress=cb)` reports (fraction, label) per
+  stage and per layer; the status row shows a gradient progress bar
+  (purple → blue → green → orange, `PROGRESS_STOPS`) and a bold percentage
+  in the matching color; the Vector pane shows the same during the first trace.
 - App icon: the pen-and-pixels design (`assets/icon-source.jpg`, white
   background made transparent by `make_app_icon.py`).
 

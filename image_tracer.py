@@ -42,6 +42,12 @@ CSS = b"""
 .thumb-label { font-size: 0.8em; }
 .thumb-pic { border-radius: 4px; }
 .value-entry { min-height: 0; padding-top: 2px; padding-bottom: 2px; }
+.trace-progress trough { min-height: 8px; border-radius: 4px; border: none;
+                         background-color: alpha(currentColor, 0.12); }
+.trace-progress progress { min-height: 8px; border-radius: 4px; border: none;
+                           background-image: linear-gradient(to right,
+                               #7c5cff, #3b82f6, #22c55e, #f97316); }
+.toolbar-row { padding: 6px 8px; }
 .vector-pane { border-left: 1px solid alpha(currentColor, 0.15); }
 """
 
@@ -199,8 +205,9 @@ class TraceWorker:
     the running trace stop at its next checkpoint and replaces any queued one,
     so dragging a slider never piles up work."""
 
-    def __init__(self, on_done):
+    def __init__(self, on_done, on_progress=None):
         self._on_done = on_done  # (generation, result, error) on the GTK main loop
+        self._on_progress = on_progress  # (generation, fraction, label) on the main loop
         self._cond = threading.Condition()
         self._pending = None
         self.generation = 0
@@ -221,13 +228,19 @@ class TraceWorker:
                 gen, img, opts = self._pending
                 self._pending = None
             try:
-                res, err = te.trace(img, opts, cancelled=lambda: gen != self.generation), None
+                res, err = te.trace(img, opts, cancelled=lambda: gen != self.generation,
+                                    progress=self._progress_cb(gen)), None
             except te.Cancelled:
                 continue
             except Exception as e:  # noqa: BLE001 - report any engine failure in the UI
                 log.exception("trace failed")
                 res, err = None, e
             GLib.idle_add(self._on_done, gen, res, err)
+
+    def _progress_cb(self, gen):
+        if self._on_progress is None:
+            return None
+        return lambda fraction, label: GLib.idle_add(self._on_progress, gen, fraction, label)
 
 
 # --------------------------------------------------------------------------
@@ -242,6 +255,7 @@ class Canvas(Gtk.DrawingArea):
         self.result: te.TraceResult | None = None
         self.surface: cairo.ImageSurface | None = None  # original bitmap
         self.show_original = show_original
+        self.progress: tuple[float, str] | None = None  # (fraction, label) while tracing
         self.set_draw_func(self._draw)
 
     def set_original(self, pil_img):
@@ -287,12 +301,15 @@ class Canvas(Gtk.DrawingArea):
             cr.set_source_surface(self.surface, 0, 0)
             cr.paint_with_alpha(0.2)
             cr.identity_matrix()
-            cr.set_source_rgb(0.25, 0.25, 0.25)
-            cr.select_font_face("Sans")
-            cr.set_font_size(15)
-            ext = cr.text_extents("Tracing…")
+            fraction, label = self.progress or (0.0, "Tracing")
+            r, g, b = progress_color(fraction)
+            cr.set_source_rgb(r / 255, g / 255, b / 255)
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            cr.set_font_size(16)
+            msg = f"{label}… {round(fraction * 100)}%"
+            ext = cr.text_extents(msg)
             cr.move_to((width - ext.width) / 2, height / 2)
-            cr.show_text("Tracing…")
+            cr.show_text(msg)
 
     @staticmethod
     def _draw_result(cr, result: te.TraceResult):
@@ -368,6 +385,21 @@ def _titled(title: str, child: Gtk.Widget) -> Gtk.Box:
     return box
 
 
+# Progress colors (the app icon's): purple -> blue -> green -> orange.
+PROGRESS_STOPS = [(0.0, (0x7c, 0x5c, 0xff)), (0.35, (0x3b, 0x82, 0xf6)),
+                  (0.7, (0x22, 0xc5, 0x5e)), (1.0, (0xf9, 0x73, 0x16))]
+
+
+def progress_color(fraction: float) -> tuple[int, int, int]:
+    """Color of the progress gradient at ``fraction`` (0..1)."""
+    f = min(max(fraction, 0.0), 1.0)
+    for (f0, c0), (f1, c1) in zip(PROGRESS_STOPS, PROGRESS_STOPS[1:]):
+        if f <= f1:
+            t = (f - f0) / (f1 - f0)
+            return tuple(round(a + (b - a) * t) for a, b in zip(c0, c1))
+    return PROGRESS_STOPS[-1][1]
+
+
 def _heading(text: str) -> Gtk.Label:
     return Gtk.Label(label=text, xalign=0, css_classes=["heading"])
 
@@ -392,17 +424,15 @@ class TracerWindow(Gtk.ApplicationWindow):
         self.preset_idx: int | None = 0  # None = custom settings
         self._quiet_depth = 0
         self._debounce_id = 0
-        self.worker = TraceWorker(self._trace_done)
+        self.busy = False
+        self.worker = TraceWorker(self._trace_done, self._trace_progress)
 
-        self._build_header()
         sidebar = self._build_layout()
         self._build_presets(sidebar)
         self._build_modes(sidebar)
         self.adv_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         sidebar.append(self.adv_box)
         self._build_advanced(self.adv_box)
-        self.spinner = Gtk.Spinner()
-        sidebar.append(self.spinner)
 
         advanced = bool(self.config.get("advanced", False))
         self.adv_btn.set_active(advanced)
@@ -412,33 +442,39 @@ class TracerWindow(Gtk.ApplicationWindow):
         self.apply_preset(0)
 
     # ---- construction ----
-    def _build_header(self):
-        header = Gtk.HeaderBar()
-        self.set_titlebar(header)
+    def _build_toolbar(self) -> Gtk.Box:
+        """Buttons in a row inside the window. There is no custom header bar:
+        the title bar is the operating system's own."""
+        bar = Gtk.Box(spacing=8, css_classes=["toolbar-row"])
         open_btn = Gtk.Button(label="Open…")
         open_btn.connect("clicked", self.on_open)
-        header.pack_start(open_btn)
+        bar.append(open_btn)
 
         level = Gtk.Box(css_classes=["linked"])
         self.simple_btn = Gtk.ToggleButton(label="Simple")
         self.adv_btn = Gtk.ToggleButton(label="Advanced", group=self.simple_btn)
         level.append(self.simple_btn)
         level.append(self.adv_btn)
-        header.pack_start(level)
+        bar.append(level)
 
+        bar.append(Gtk.Box(hexpand=True))  # pushes the export buttons to the right
+        self.copy_btn = Gtk.Button(label="Copy SVG", sensitive=False)
+        self.copy_btn.connect("clicked", self.on_copy)
+        bar.append(self.copy_btn)
         self.export_btn = Gtk.Button(label="Export SVG…", sensitive=False,
                                      css_classes=["suggested-action"])
         self.export_btn.connect("clicked", self.on_export)
-        header.pack_end(self.export_btn)
-        self.copy_btn = Gtk.Button(label="Copy SVG", sensitive=False)
-        self.copy_btn.connect("clicked", self.on_copy)
-        header.pack_end(self.copy_btn)
-        header.set_title_widget(Gtk.Label(label="Open Image Tracer", css_classes=["title"]))
+        bar.append(self.export_btn)
+        return bar
 
     def _build_layout(self) -> Gtk.Box:
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.set_child(root)
+        root.append(self._build_toolbar())
+        root.append(Gtk.Separator())
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL, position=350,
-                          shrink_start_child=False, resize_start_child=False)
-        self.set_child(paned)
+                          shrink_start_child=False, resize_start_child=False, vexpand=True)
+        root.append(paned)
         scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_top=14,
                           margin_bottom=14, margin_start=14, margin_end=14)
@@ -455,12 +491,21 @@ class TracerWindow(Gtk.ApplicationWindow):
         vector.add_css_class("vector-pane")
         previews.append(vector)
         main.append(previews)
-        self.status = Gtk.Label(xalign=0, margin_start=10, margin_end=10, margin_top=4,
-                                margin_bottom=4, label="No image loaded",
+        status_row = Gtk.Box(spacing=10, margin_start=10, margin_end=10, margin_top=4,
+                             margin_bottom=4)
+        self.status = Gtk.Label(xalign=0, hexpand=True, label="No image loaded",
                                 css_classes=["dim-label"], ellipsize=Pango.EllipsizeMode.END)
         # Long status lines must not widen the window; the full text is in the tooltip.
         self.status.bind_property("label", self.status, "tooltip-text")
-        main.append(self.status)
+        status_row.append(self.status)
+        self.progress_box = Gtk.Box(spacing=8, visible=False)
+        self.progress_bar = Gtk.ProgressBar(valign=Gtk.Align.CENTER, width_request=220,
+                                            css_classes=["trace-progress"])
+        self.progress_pct = Gtk.Label(width_chars=5, xalign=1.0)
+        self.progress_box.append(self.progress_bar)
+        self.progress_box.append(self.progress_pct)
+        status_row.append(self.progress_box)
+        main.append(status_row)
         paned.set_end_child(main)
 
         for canvas in (self.orig_canvas, self.canvas):
@@ -665,13 +710,31 @@ class TracerWindow(Gtk.ApplicationWindow):
         if not self.image:
             return
         self.worker.submit(self.image, self.options())
-        self.spinner.start()
-        self.status.set_label("Tracing…")
+        self.busy = True
+        self._show_progress(0.0, "Starting")
+
+    def _show_progress(self, fraction, label):
+        pct = round(fraction * 100)
+        r, g, b = progress_color(fraction)
+        self.progress_box.set_visible(True)
+        self.progress_bar.set_fraction(fraction)
+        self.progress_pct.set_markup(f'<b><span foreground="#{r:02x}{g:02x}{b:02x}">{pct}%</span></b>')
+        self.status.set_label(f"{label}…")
+        self.canvas.progress = (fraction, label)
+        if self.canvas.result is None:
+            self.canvas.queue_draw()
+
+    def _trace_progress(self, gen, fraction, label):
+        if gen == self.worker.generation and self.busy:
+            self._show_progress(fraction, label)
+        return False
 
     def _trace_done(self, gen, res, err):
         if gen != self.worker.generation:
             return False  # a newer request is on its way
-        self.spinner.stop()
+        self.busy = False
+        self.progress_box.set_visible(False)
+        self.canvas.progress = None
         if err is not None:
             self.status.set_label(f"Error: {err}")
             return False
@@ -783,7 +846,7 @@ class SelfTest:
         GLib.timeout_add(500, self._poll, win)
 
     def _poll(self, win):
-        done = win.result is not None and win.worker.generation and not win.spinner.get_spinning()
+        done = win.result is not None and win.worker.generation and not win.busy
         if not done and GLib.get_monotonic_time() < self.deadline:
             return True
         self._finish(win)

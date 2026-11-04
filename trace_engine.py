@@ -1106,6 +1106,11 @@ class _Ctx:
     rgb: np.ndarray  # upscaled
     opaque: np.ndarray
     check: Callable[[], None]  # raises Cancelled
+    report: Callable[[float, str], None] = lambda fraction, label: None
+
+    def layer_progress(self, i: int, n: int):
+        """Tracing layer i of n: the last half of the progress bar."""
+        self.report(0.5 + 0.48 * i / max(n, 1), f"Tracing layers {i + 1}/{n}" if n > 1 else "Tracing")
 
     def trace(self, mask, **kw) -> list[Contour]:
         return _trace_mask(mask, self.opts, self.scale, **kw)
@@ -1119,6 +1124,7 @@ def _quantize(ctx: _Ctx, n: int):
     original-size image (fast); pixels are classified on the upscaled one.
     Returns (labels HxW with -1 = transparent, palette list[(r,g,b)])."""
     opts, rgb1x, opaque1x, rgb, opaque = ctx.opts, ctx.rgb1, ctx.opaque1, ctx.rgb, ctx.opaque
+    ctx.report(0.40, "Finding colors")
     if not opaque1x.any():
         return np.full(opaque.shape, -1, np.int32), []
     # Sample colors only from fully opaque pixels: edge pixels that blend into
@@ -1158,8 +1164,10 @@ def _quantize(ctx: _Ctx, n: int):
     unresolved = opaque & ~lut_pure[keys] if opts.cleanup else np.zeros(opaque.shape, bool)
     if unresolved.any():
         lab[unresolved] = -2  # not a vote
+        ctx.report(0.44, "Sorting edge pixels")
         _absorb_minor(lab, unresolved, rgb, np.array(palette, np.float32))
     ctx.check()
+    ctx.report(0.47, "Smoothing shapes")
     lab = _smooth_labels(lab, len(palette), opts.edge_smooth * ctx.scale)
     return lab, palette
 
@@ -1168,6 +1176,7 @@ def _mode_brightness(ctx: _Ctx) -> list[Layer]:
     mask = _luminance(ctx.rgb) < ctx.opts.threshold
     if ctx.opts.invert:
         mask = ~mask
+    ctx.layer_progress(0, 1)
     return [Layer((0, 0, 0), ctx.trace(mask & ctx.opaque))]
 
 
@@ -1175,6 +1184,7 @@ def _mode_edge(ctx: _Ctx) -> list[Layer]:
     mask = _edge_mask(ctx.rgb, ctx.opts.threshold, ctx.scale)
     if ctx.opts.invert:
         mask = ~mask
+    ctx.layer_progress(0, 1)
     return [Layer((0, 0, 0), ctx.trace(mask & ctx.opaque))]
 
 
@@ -1185,6 +1195,7 @@ def _mode_centerline(ctx: _Ctx) -> list[Layer]:
     if opts.invert:
         mask = ~mask
     mask &= ctx.opaque
+    ctx.layer_progress(0, 1)
     contours, width = trace_centerline(mask, scale, min_length=max(2.0, opts.speckles * 2.0))
     ink = mask[::scale, ::scale][:ctx.rgb1.shape[0], :ctx.rgb1.shape[1]]
     color = tuple(int(v) for v in np.median(ctx.rgb1[ink], axis=0)) if ink.any() else (0, 0, 0)
@@ -1201,6 +1212,7 @@ def _mode_quant(ctx: _Ctx) -> list[Layer]:
     mask = ((rank[lab] % 2) == 0) & (lab >= 0)
     if ctx.opts.invert:
         mask = ~mask & ctx.opaque
+    ctx.layer_progress(0, 1)
     return [Layer((0, 0, 0), ctx.trace(mask))]
 
 
@@ -1210,8 +1222,9 @@ def _mode_gray_steps(ctx: _Ctx) -> list[Layer]:
     n = max(1, opts.scans)
     thresholds = [(k + 1) / (n + 1) for k in range(n)]
     layers = []
-    for k, t in reversed(list(enumerate(thresholds))):  # light first, dark on top
+    for i, (k, t) in enumerate(reversed(list(enumerate(thresholds)))):  # light first
         ctx.check()
+        ctx.layer_progress(i, n)
         lo = thresholds[k - 1] if k > 0 else 0.0
         mask = lum < t if opts.stack else (lum < t) & (lum >= lo)
         v = int(round(255 * (lo + t) / 2))
@@ -1237,8 +1250,9 @@ def _mode_colors(ctx: _Ctx) -> list[Layer]:
     # distinct colors (text, icons) keep ``speckles`` so small letters survive.
     wlab = _srgb_to_lab(np.array(palette, np.float32)) * LUMA_WEIGHTS if palette else None
     painted, layers = [], []
-    for k in order:
+    for i, k in enumerate(order):
         ctx.check()
+        ctx.layer_progress(i, len(order))
         own = lab == k
         sp = opts.speckles
         if painted and opts.noise_speckles > opts.speckles:
@@ -1268,15 +1282,23 @@ assert set(_MODE_FUNCS) == set(MODE_IDS)
 
 
 def trace(img: Image.Image, opts: TraceOptions,
-          cancelled: Callable[[], bool] = lambda: False) -> TraceResult:
+          cancelled: Callable[[], bool] = lambda: False,
+          progress: Callable[[float, str], None] | None = None) -> TraceResult:
     """Trace ``img`` with ``opts``. Raises Cancelled as soon as ``cancelled()``
-    returns true (checked between stages and layers)."""
+    returns true (checked between stages and layers). ``progress(fraction,
+    label)`` is called as the work advances (fraction 0..1)."""
     if opts.mode not in _MODE_FUNCS:
         raise ValueError(f"unknown mode {opts.mode!r}")
 
     def check():
         if cancelled():
             raise Cancelled()
+
+    def report(fraction: float, label: str):
+        if progress is not None:
+            progress(min(max(fraction, 0.0), 1.0), label)
+
+    report(0.0, "Preparing")
 
     img = img.convert("RGBA")
     w, h = img.size
@@ -1288,12 +1310,15 @@ def trace(img: Image.Image, opts: TraceOptions,
     opaque1 = alpha1 >= 128 if opts.keep_transparency else np.ones((h, w), bool)
     white = Image.new("RGBA", img.size, (255, 255, 255, 255))
     rgb1 = np.asarray(Image.alpha_composite(white, img).convert("RGB"))
+    if opts.denoise > 0:
+        report(0.03, "Removing noise")
     rgb1 = _bilateral(rgb1, opts.denoise)
     check()
 
     texts: list[TextItem] = []
     if opts.ocr:
         if ocr_available():
+            report(0.10, "Reading text")
             rgb1, texts = _apply_ocr(rgb1, opts)
             check()
         else:
@@ -1306,6 +1331,7 @@ def trace(img: Image.Image, opts: TraceOptions,
         rgb1 = np.asarray(Image.fromarray(rgb1).filter(ImageFilter.GaussianBlur(1.0)))
 
     if scale > 1:
+        report(0.32, f"Upscaling {scale}×")
         size = (w * scale, h * scale)
         rgb = None
         if opts.upscaler != "lanczos":
@@ -1326,6 +1352,7 @@ def trace(img: Image.Image, opts: TraceOptions,
     else:
         rgb, opaque = rgb1, opaque1
 
-    ctx = _Ctx(opts, scale, rgb1, opaque1, alpha1, rgb, opaque, check)
+    ctx = _Ctx(opts, scale, rgb1, opaque1, alpha1, rgb, opaque, check, report)
     layers = _MODE_FUNCS[opts.mode](ctx)
+    report(1.0, "Done")
     return TraceResult(w, h, layers, scale, texts, opts.font_family, warnings)
