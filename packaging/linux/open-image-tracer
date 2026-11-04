@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Start Image Tracer from <prefix>/share/open-image-tracer (works under /usr, /app, AppImage).
+here=$(dirname "$(readlink -f "$0")")
+exec python3 "$here/../share/open-image-tracer/image_tracer.py" "$@"

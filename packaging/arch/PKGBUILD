@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Maintainer: Sabaoon <sabaoongfx@gmail.com>
+pkgname=open-image-tracer
+pkgver=0.1.1
+pkgrel=1
+pkgdesc="Convert images (PNG, JPEG, ...) into SVG vectors"
+arch=('any')
+url="https://github.com/sabaoongfx/oit-open-image-tracer"
+license=('GPL-3.0-or-later')
+depends=('python' 'python-gobject' 'gtk4' 'python-cairo' 'python-numpy' 'python-pillow'
+         'potrace' 'fontconfig')
+optdepends=('tesseract: recognize text as editable SVG text (OCR)'
+            'tesseract-data-eng: English data for OCR')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')  # filled in by updpkgsums in the release workflow
+
+package() {
+  cd "oit-open-image-tracer-$pkgver"
+  ./packaging/linux/install.sh "$pkgdir" /usr
+}

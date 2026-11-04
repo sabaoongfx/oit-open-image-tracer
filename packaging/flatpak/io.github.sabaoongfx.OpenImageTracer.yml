@@ -87,23 +87,13 @@ modules:
   - name: open-image-tracer
     buildsystem: simple
     build-commands:
-      - install -d /app/share/open-image-tracer
-      - install -m644 image_tracer.py trace_engine.py centerline.py presets.py
-        /app/share/open-image-tracer/
-      - install -d /app/share/open-image-tracer/assets /app/share/icons
-      - cp -r assets/thumbs assets/icons /app/share/open-image-tracer/assets/
-      - cp -r assets/icons/hicolor /app/share/icons/
-      - install -Dm755 flatpak/open-image-tracer.sh /app/bin/open-image-tracer
-      - install -Dm644 flatpak/io.github.sabaoongfx.OpenImageTracer.desktop
-        /app/share/applications/io.github.sabaoongfx.OpenImageTracer.desktop
-      - install -Dm644 flatpak/io.github.sabaoongfx.OpenImageTracer.metainfo.xml
-        /app/share/metainfo/io.github.sabaoongfx.OpenImageTracer.metainfo.xml
+      # the same install script as the .deb/.rpm/pacman packages
+      - packaging/linux/install.sh "" /app
     sources:
       - type: dir
-        path: ..
+        path: ../..
         skip:
           - .git
           - tests
           - tools
           - __pycache__
-          - assets/samples
