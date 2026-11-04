@@ -105,6 +105,20 @@ Release state:
   workflow, download `pkg-windows`, attach the MSI (versioned + versionless) to
   v0.1.1 and add both to its SHA256SUMS.
 
+Signed apt + pacman repos (like Open Task Manager/notz): GitHub Pages of this
+repo, https://sabaoongfx.github.io/oit-open-image-tracer/ (`/KEY.gpg`,
+`dists/stable`, `/arch/{x86_64,aarch64}/open-image-tracer.db`). Built by
+`.github/workflows/publish-linux.yml` on release *published* (or
+`gh workflow run publish-linux.yml -f tag=vX.Y.Z`): re-signs the release's
+.deb (reprepro, `packaging/apt/distributions`) and Arch package
+(`packaging/arch/make-repo.sh`), deploys Pages, then `verify-arch` /
+`verify-apt` install from the live repos and run `--self-test`. Signing key
+"Image Tracer packages" (rsa4096, no passphrase, fingerprint
+0BB3344EA53F9F3457D421EFE8E503CE9A824E81): private key in the user's local
+keyring (revocation cert in ~/.gnupg/openpgp-revocs.d/) and as the
+`PACKAGES_GPG_PRIVATE_KEY` secret. Locally, several secret keys exist (notz,
+OTM, VLC), so make-repo.sh run by hand should get `GPGKEY=<fpr>`.
+
 On this machine: the Flatpak is installed (user, from a local v0.1.0 bundle,
 origin `openimagetracer-origin`); the native source launcher is uninstalled.
 

@@ -14,6 +14,37 @@ python3 image_tracer.py [image]
 **Simple** shows only presets and modes; **Advanced** shows every setting.
 Each slider has a field next to it for typing exact values.
 
+## Install
+
+### Ubuntu, Debian, Linux Mint, Pop!_OS (apt)
+
+Ubuntu 24.04+ or Debian 13+. Add the signed repository once:
+
+```bash
+curl -fsSL https://sabaoongfx.github.io/oit-open-image-tracer/KEY.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/open-image-tracer.gpg
+echo "deb [signed-by=/usr/share/keyrings/open-image-tracer.gpg] https://sabaoongfx.github.io/oit-open-image-tracer stable main" \
+  | sudo tee /etc/apt/sources.list.d/open-image-tracer.list
+sudo apt update && sudo apt install open-image-tracer
+```
+
+Updates then arrive with the normal `sudo apt upgrade`.
+
+### Arch Linux, Manjaro, EndeavourOS (pacman)
+
+A signed repository:
+
+```bash
+curl -fsSL https://sabaoongfx.github.io/oit-open-image-tracer/KEY.gpg | sudo pacman-key --add -
+sudo pacman-key --lsign-key "Image Tracer packages"
+printf '\n[open-image-tracer]\nServer = https://sabaoongfx.github.io/oit-open-image-tracer/arch/$arch\n' \
+  | sudo tee -a /etc/pacman.conf
+sudo pacman -Sy open-image-tracer
+```
+
+Updates then arrive with the normal `sudo pacman -Syu`. For OCR, also install
+`tesseract` and `tesseract-data-eng`.
+
 ## Download
 
 Every release on the
@@ -25,9 +56,9 @@ has these packages (the latest version is always at
 |---|---|---|
 | Any Linux (Flatpak) | `Open-Image-Tracer-x86_64.flatpak` | `flatpak install --user Open-Image-Tracer-x86_64.flatpak` |
 | Any Linux (AppImage) | `Open-Image-Tracer-x86_64.AppImage` | `chmod +x` it and run it |
-| Debian 13+ / Ubuntu 24.04+ | `Open-Image-Tracer-all.deb` | `sudo apt install ./Open-Image-Tracer-all.deb` |
+| Debian 13+ / Ubuntu 24.04+ | `Open-Image-Tracer-all.deb` | `sudo apt install ./Open-Image-Tracer-all.deb` (prefer the apt repo above for updates) |
 | Fedora | `Open-Image-Tracer-noarch.rpm` | `sudo dnf install ./Open-Image-Tracer-noarch.rpm` |
-| Arch / Manjaro | `Open-Image-Tracer-any.pkg.tar.zst` | `sudo pacman -U Open-Image-Tracer-any.pkg.tar.zst` |
+| Arch / Manjaro | `Open-Image-Tracer-any.pkg.tar.zst` | `sudo pacman -U Open-Image-Tracer-any.pkg.tar.zst` (prefer the pacman repo above for updates) |
 | Windows 10/11 | `Open-Image-Tracer-x64-setup.exe` or `.msi` | run the installer |
 | macOS (Apple Silicon / Intel) | `Open-Image-Tracer-aarch64.dmg` / `-x64.dmg` | open, drag to Applications (unsigned: right-click → Open the first time) |
 
@@ -41,7 +72,11 @@ builds; a PyInstaller spec shared by the AppImage, Windows and macOS builds;
 and per-format build scripts. `.github/workflows/release.yml` builds every
 format, installs/runs each one with `--self-test` (traces a sample with OCR
 and saves a picture of the window), and on a `v*` tag matching `VERSION`
-attaches everything to a draft release.
+attaches everything to a draft release. Publishing the release runs
+`.github/workflows/publish-linux.yml`, which signs that release's .deb and Arch
+package with the "Image Tracer packages" key and rebuilds the apt and pacman
+repositories on GitHub Pages, then installs from them on fresh Ubuntu and Arch
+and runs `--self-test`.
 
 To release: bump `VERSION`, `pkgver` in `packaging/arch/PKGBUILD`, `Version`
 in `packaging/rpm/open-image-tracer.spec` and add a `<release>` to the

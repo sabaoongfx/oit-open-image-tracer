@@ -1,0 +1,145 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Publish Linux repos
+
+# Runs when a release is published (after release.yml's draft was reviewed), so
+# apt/pacman users only ever see releases that were actually shipped. Takes that
+# release's .deb and Arch package (the same files users can download), signs
+# them with the "Image Tracer packages" key and rebuilds one GitHub Pages site
+# from scratch (only the newest version is kept; package managers only need that):
+#   /                     signed apt repo   (dists/, pool/)
+#   /arch/{x86_64,aarch64}/  signed pacman repo (open-image-tracer.db + package)
+#   /KEY.gpg              the public key that signs both
+# Then installs the app from the live repos on fresh Arch and Ubuntu and runs
+# --self-test. Pre-release tags containing '-' are skipped.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v0.1.1)'
+        required: true
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  SITE: https://sabaoongfx.github.io/oit-open-image-tracer
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  pacman:
+    if: ${{ !contains(github.event.release.tag_name || inputs.tag, '-') }}
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install tools
+        run: pacman -Syu --noconfirm --needed git github-cli
+      - uses: actions/checkout@v4
+      - name: Download the release's Arch package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern 'open-image-tracer-*-any.pkg.tar.zst' --dir pkgs
+          ls -l pkgs
+      - name: Sign and create repos (the package is architecture-independent)
+        env:
+          PACKAGES_GPG_PRIVATE_KEY: ${{ secrets.PACKAGES_GPG_PRIVATE_KEY }}
+        run: |
+          packaging/arch/make-repo.sh pkgs arch-repo/x86_64
+          packaging/arch/make-repo.sh pkgs arch-repo/aarch64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch-repo
+          path: arch-repo
+
+  pages:
+    needs: pacman
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install reprepro
+        run: sudo apt-get update && sudo apt-get install -y reprepro
+      - name: Import signing key
+        env:
+          PACKAGES_GPG_PRIVATE_KEY: ${{ secrets.PACKAGES_GPG_PRIVATE_KEY }}
+        run: echo "$PACKAGES_GPG_PRIVATE_KEY" | gpg --batch --import
+      - name: Download .deb from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$TAG" --pattern 'open-image-tracer_*_all.deb' --dir debs
+      - name: Build apt repo
+        run: |
+          mkdir -p reprepro/conf public
+          cp packaging/apt/distributions reprepro/conf/
+          reprepro --basedir reprepro --outdir "$PWD/public" includedeb stable debs/*.deb
+          gpg --armor --export > public/KEY.gpg
+          touch public/.nojekyll
+          cat > public/index.html <<HTML
+          <!doctype html><meta charset="utf-8"><title>Image Tracer packages</title>
+          <h1>Image Tracer package repositories</h1>
+          <p>Signed apt and pacman repositories for
+          <a href="https://github.com/sabaoongfx/oit-open-image-tracer">Image Tracer</a>
+          ($TAG). Setup instructions are in the project's README.</p>
+          HTML
+      - uses: actions/download-artifact@v4
+        with:
+          name: arch-repo
+          path: public/arch
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  # Install from the live repositories exactly like the README tells users to.
+  verify-arch:
+    needs: pages
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      GSK_RENDERER: cairo
+    steps:
+      - name: Add the repo and install
+        run: |
+          pacman -Sy --noconfirm --needed curl
+          for i in $(seq 30); do curl -fsSL "$SITE/arch/x86_64/open-image-tracer.db" -o /dev/null && break; sleep 10; done
+          pacman-key --init
+          curl -fsSL "$SITE/KEY.gpg" | pacman-key --add -
+          pacman-key --lsign-key "Image Tracer packages"
+          printf '\n[open-image-tracer]\nServer = %s/arch/$arch\n' "$SITE" >> /etc/pacman.conf
+          pacman -Sy --noconfirm open-image-tracer tesseract tesseract-data-eng xorg-server-xvfb xorg-xauth
+      - name: Self-test
+        run: xvfb-run -a open-image-tracer --self-test self-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: self-test-pacman-repo, path: self-test}
+
+  verify-apt:
+    needs: pages
+    runs-on: ubuntu-24.04
+    env:
+      GSK_RENDERER: cairo
+    steps:
+      - name: Add the repo and install
+        run: |
+          for i in $(seq 30); do curl -fsSL "$SITE/dists/stable/InRelease" -o /dev/null && break; sleep 10; done
+          curl -fsSL "$SITE/KEY.gpg" | sudo gpg --dearmor -o /usr/share/keyrings/open-image-tracer.gpg
+          echo "deb [signed-by=/usr/share/keyrings/open-image-tracer.gpg] $SITE stable main" \
+              | sudo tee /etc/apt/sources.list.d/open-image-tracer.list
+          sudo apt-get update
+          sudo apt-get install -y open-image-tracer xvfb
+      - name: Self-test
+        run: xvfb-run -a open-image-tracer --self-test self-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: self-test-apt-repo, path: self-test}
