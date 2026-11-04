@@ -25,11 +25,12 @@ import trace_engine as te  # noqa: E402
 log = logging.getLogger("image_tracer")
 
 APP_ID = "io.github.sabaoongfx.OpenImageTracer"  # icon, .desktop and Flatpak id
-HERE = os.path.dirname(os.path.abspath(__file__))
+# Source folder, or the unpacked bundle of a frozen (PyInstaller) build.
+HERE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 THUMB_DIR = os.path.join(HERE, "assets", "thumbs")
 ICON_DIR = os.path.join(HERE, "assets", "icons")  # hicolor theme with APP_ID icons
-CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
-                      "image-tracer", "config.json")
+# Per-OS config folder (~/.config on Linux, %APPDATA% on Windows, ~/Library/... on macOS).
+CONFIG = os.path.join(GLib.get_user_config_dir(), "image-tracer", "config.json")
 IMAGE_PATTERNS = ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.tif", "*.tiff", "*.webp"]
 THUMB_W, THUMB_H = 88, 60
 DEBOUNCE_MS = 250
@@ -763,10 +764,69 @@ class TracerWindow(Gtk.ApplicationWindow):
             self.status.set_label("SVG copied to clipboard")
 
 
+SAMPLE = os.path.join(HERE, "assets", "samples", "ui.jpg")
+
+
+class SelfTest:
+    """`--self-test OUTDIR`: open the real window, trace the bundled sample with
+    the OCR preset, save the SVG, a picture of the window and a report, then
+    quit (exit code 1 on failure). Used to check packaged builds on every OS."""
+
+    def __init__(self, app, outdir):
+        self.app, self.outdir, self.ok = app, outdir, False
+        self.deadline = GLib.get_monotonic_time() + 180 * 1_000_000
+
+    def start(self, win):
+        os.makedirs(self.outdir, exist_ok=True)
+        win.load(SAMPLE)
+        win.apply_preset(next(i for i, p in enumerate(P.PRESETS) if p.options.get("ocr")))
+        GLib.timeout_add(500, self._poll, win)
+
+    def _poll(self, win):
+        done = win.result is not None and win.worker.generation and not win.spinner.get_spinning()
+        if not done and GLib.get_monotonic_time() < self.deadline:
+            return True
+        self._finish(win)
+        return False
+
+    def _finish(self, win):
+        import platform
+        res = win.result
+        ocr_ok, ocr_msg = te.ocr_status()
+        lines = [f"platform: {platform.platform()}", f"python: {sys.version.split()[0]}",
+                 f"gtk: {Gtk.get_major_version()}.{Gtk.get_minor_version()}.{Gtk.get_micro_version()}",
+                 f"potrace: {te._lib}", f"ocr: {ocr_ok} ({ocr_msg})",
+                 f"status: {win.status.get_label()}"]
+        if res is not None:
+            lines += [f"paths: {res.path_count}", f"texts: {[t.text for t in res.texts]}",
+                      f"warnings: {res.warnings}"]
+            with open(os.path.join(self.outdir, "self-test.svg"), "w", encoding="utf-8") as fh:
+                fh.write(res.to_svg())
+        self.ok = res is not None and res.path_count > 0 and (not ocr_ok or len(res.texts) > 0)
+        lines.append(f"result: {'PASS' if self.ok else 'FAIL'}")
+        with open(os.path.join(self.outdir, "self-test.txt"), "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+        print("\n".join(lines), flush=True)
+        try:  # picture of the window, rendered by GTK itself
+            p = Gtk.WidgetPaintable.new(win)
+            snap = Gtk.Snapshot()
+            p.snapshot(snap, win.get_width(), win.get_height())
+            node = snap.to_node()
+            if node is not None:
+                win.get_native().get_renderer().render_texture(node, None).save_to_png(
+                    os.path.join(self.outdir, "self-test.png"))
+        except Exception as e:  # noqa: BLE001 - a missing picture must not hide the result
+            print(f"window snapshot failed: {e}", flush=True)
+        self.app.quit()
+
+
 class TracerApp(Gtk.Application):
-    def __init__(self):
-        super().__init__(application_id=APP_ID,
-                         flags=Gio.ApplicationFlags.HANDLES_OPEN)
+    def __init__(self, self_test_dir=None):
+        flags = Gio.ApplicationFlags.HANDLES_OPEN
+        if self_test_dir:
+            flags |= Gio.ApplicationFlags.NON_UNIQUE
+        super().__init__(application_id=APP_ID, flags=flags)
+        self.self_test = SelfTest(self, self_test_dir) if self_test_dir else None
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
@@ -785,7 +845,9 @@ class TracerApp(Gtk.Application):
         return win
 
     def do_activate(self):
-        self._window()
+        win = self._window()
+        if self.self_test:
+            self.self_test.start(win)
 
     def do_open(self, files, _n, _hint):
         win = self._window()
@@ -793,6 +855,17 @@ class TracerApp(Gtk.Application):
             win.load(files[0].get_path())
 
 
-if __name__ == "__main__":
+def main(argv=None):
+    argv = list(sys.argv if argv is None else argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
-    sys.exit(TracerApp().run(sys.argv))
+    if "--self-test" in argv:
+        i = argv.index("--self-test")
+        outdir = argv[i + 1] if i + 1 < len(argv) else "self-test-output"
+        app = TracerApp(self_test_dir=outdir)
+        app.run(argv[:1])
+        return 0 if app.self_test.ok else 1
+    return TracerApp().run(argv)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

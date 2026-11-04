@@ -88,7 +88,50 @@ class Cancelled(Exception):
 # --------------------------------------------------------------------------
 # libpotrace bindings
 # --------------------------------------------------------------------------
-_lib = ctypes.CDLL(ctypes.util.find_library("potrace") or "libpotrace.so.0")
+import sys  # noqa: E402
+
+# Folder of a frozen (PyInstaller) build, where bundled libraries/tools live.
+BUNDLE_DIR = getattr(sys, "_MEIPASS", None)
+
+
+def _load_potrace():
+    """libpotrace from a bundle, the system library path, or its usual names
+    on Linux, Windows (MSYS2) and macOS (Homebrew)."""
+    names = ["libpotrace.so.0", "libpotrace-0.dll", "libpotrace.0.dylib", "libpotrace.dylib"]
+    candidates = []
+    if BUNDLE_DIR:
+        candidates += [os.path.join(BUNDLE_DIR, n) for n in names]
+    found = ctypes.util.find_library("potrace")
+    if found:
+        candidates.append(found)
+    candidates += names + ["/opt/homebrew/lib/libpotrace.dylib", "/usr/local/lib/libpotrace.dylib"]
+    errors = []
+    for c in candidates:
+        try:
+            return ctypes.CDLL(c)
+        except OSError as e:
+            errors.append(f"{c}: {e}")
+    raise OSError("libpotrace not found:\n  " + "\n  ".join(errors))
+
+
+_lib = _load_potrace()
+
+
+def _tool(name: str) -> str | None:
+    """Path of an external tool: bundled copy first, then PATH."""
+    if BUNDLE_DIR:
+        for cand in (name, name + ".exe"):
+            p = os.path.join(BUNDLE_DIR, "bin", cand)
+            if os.path.isfile(p):
+                return p
+    return shutil.which(name)
+
+
+def _tesseract_env() -> dict | None:
+    """Environment for a bundled tesseract (points it at the bundled data)."""
+    if BUNDLE_DIR and os.path.isdir(os.path.join(BUNDLE_DIR, "tessdata")):
+        return {**os.environ, "TESSDATA_PREFIX": os.path.join(BUNDLE_DIR, "tessdata")}
+    return None
 
 POTRACE_CURVETO = 1
 POTRACE_CORNER = 2
@@ -241,7 +284,10 @@ def _font_for(family: str):
             return _FONTS[first]
     font = None
     try:
-        path = subprocess.run(["fc-match", "-f", "%{file}", first], capture_output=True,
+        fc = _tool("fc-match")
+        if not fc:
+            raise FileNotFoundError("fc-match")
+        path = subprocess.run([fc, "-f", "%{file}", first], capture_output=True,
                               text=True, timeout=10).stdout.strip()
         if path:
             font = ImageFont.truetype(path, 100)
@@ -442,12 +488,12 @@ def ocr_status() -> tuple[bool, str]:
     A negative answer is re-checked each call, so installing works live."""
     global _OCR_STATUS
     if _OCR_STATUS is None or not _OCR_STATUS[0]:
-        if not shutil.which("tesseract"):
+        if not _tool("tesseract"):
             _OCR_STATUS = (False, "OCR needs tesseract: sudo pacman -S tesseract tesseract-data-eng")
         else:
             try:
-                langs = subprocess.run(["tesseract", "--list-langs"], capture_output=True,
-                                       text=True, timeout=20).stdout.split()
+                langs = subprocess.run([_tool("tesseract"), "--list-langs"], capture_output=True,
+                                       text=True, timeout=20, env=_tesseract_env()).stdout.split()
             except (OSError, subprocess.SubprocessError) as e:
                 log.warning("tesseract --list-langs failed: %s", e)
                 langs = []
@@ -703,8 +749,8 @@ def _run_tesseract(gray: Image.Image, factor: int) -> list[OcrWord]:
     try:
         path = os.path.join(tmp, "in.png")
         gray.save(path)
-        proc = subprocess.run(["tesseract", path, "stdout", "--psm", "11", "tsv"],
-                              capture_output=True, text=True, timeout=120)
+        proc = subprocess.run([_tool("tesseract"), path, "stdout", "--psm", "11", "tsv"],
+                              capture_output=True, text=True, timeout=120, env=_tesseract_env())
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     if proc.returncode != 0:
