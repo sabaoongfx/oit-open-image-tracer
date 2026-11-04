@@ -119,7 +119,9 @@ repo, https://sabaoongfx.github.io/oit-open-image-tracer/ (`/KEY.gpg`,
 `gh workflow run publish-linux.yml -f tag=vX.Y.Z`): re-signs the release's
 .deb (reprepro, `packaging/apt/distributions`) and Arch package
 (`packaging/arch/make-repo.sh`), deploys Pages, then `verify-arch` /
-`verify-apt` install from the live repos and run `--self-test`. Signing key
+`verify-apt` install from the live repos and run `--self-test`. The `github-pages` environment allows
+deployments from branch `main` and tags `v*` (added after v0.1.2's publish was
+rejected: a release runs on its tag ref). Signing key
 "Image Tracer packages" (rsa4096, no passphrase, fingerprint
 0BB3344EA53F9F3457D421EFE8E503CE9A824E81): private key in the user's local
 keyring (revocation cert in ~/.gnupg/openpgp-revocs.d/) and as the
