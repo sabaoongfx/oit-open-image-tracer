@@ -78,5 +78,13 @@ drawing the glow between "behind" and "front" regions (detection broke the glow)
 Known limits: soft semi-transparent blends (arc fading into the glow, the
 border's lower edge) come out as slightly hard-edged lavender areas.
 
+Also delivered `~/Downloads/Image-to-SVG Converter Icon (vector).svg` (26 KB,
+14 gradients): the user chose a clean background (one gradient, no swooshes or
+drop shadows) over approximating the painted background, which looked cloudy.
+Opt-in experiments kept in the tool (env vars, default off): `SOFT_MODE`
+(blurred soft shapes for shading), `COARSE` (edges at 1/N resolution for soft
+borders), `MERGE_EDGE` (merge regions with weak borders). Detail recovery
+skips areas wider than `DETAIL_MAX_WIDTH` (those are shading, e.g. shadows).
+
 Possible next step: offer it in the app as a "Smooth gradients" option for
 logos/illustrations (would need its own golden tests).
