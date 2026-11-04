@@ -38,6 +38,7 @@ CSS = b"""
 .thumb-label { font-size: 0.8em; }
 .thumb-pic { border-radius: 4px; }
 .value-entry { min-height: 0; padding-top: 2px; padding-bottom: 2px; }
+.vector-pane { border-left: 1px solid alpha(currentColor, 0.15); }
 """
 
 
@@ -229,14 +230,14 @@ class TraceWorker:
 # Canvas
 # --------------------------------------------------------------------------
 class Canvas(Gtk.DrawingArea):
-    """Draws either the traced vectors or the original bitmap, fit to view."""
+    """Draws the original bitmap or the traced vectors, fit to view."""
     PAD = 16
 
-    def __init__(self):
+    def __init__(self, show_original: bool = False):
         super().__init__(hexpand=True, vexpand=True)
         self.result: te.TraceResult | None = None
         self.surface: cairo.ImageSurface | None = None  # original bitmap
-        self.show_original = False
+        self.show_original = show_original
         self.set_draw_func(self._draw)
 
     def set_original(self, pil_img):
@@ -272,12 +273,22 @@ class Canvas(Gtk.DrawingArea):
         cr.rectangle(0, 0, iw, ih)
         cr.set_source_rgb(1, 1, 1)
         cr.fill()
-        if self.show_original or self.result is None:
+        if self.show_original:
             cr.set_source_surface(self.surface, 0, 0)
             cr.get_source().set_filter(cairo.FILTER_GOOD)
             cr.paint()
-        else:
+        elif self.result is not None:
             self._draw_result(cr, self.result)
+        else:  # first trace still running: faded image + note, never a fake "result"
+            cr.set_source_surface(self.surface, 0, 0)
+            cr.paint_with_alpha(0.2)
+            cr.identity_matrix()
+            cr.set_source_rgb(0.25, 0.25, 0.25)
+            cr.select_font_face("Sans")
+            cr.set_font_size(15)
+            ext = cr.text_extents("Tracing…")
+            cr.move_to((width - ext.width) / 2, height / 2)
+            cr.show_text("Tracing…")
 
     @staticmethod
     def _draw_result(cr, result: te.TraceResult):
@@ -345,6 +356,14 @@ def _grid() -> Gtk.FlowBox:
                        selection_mode=Gtk.SelectionMode.NONE, column_spacing=4, row_spacing=4)
 
 
+def _titled(title: str, child: Gtk.Widget) -> Gtk.Box:
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    box.append(Gtk.Label(label=title, xalign=0, margin_start=10, margin_top=4,
+                         margin_bottom=2, css_classes=["caption-heading", "dim-label"]))
+    box.append(child)
+    return box
+
+
 def _heading(text: str) -> Gtk.Label:
     return Gtk.Label(label=text, xalign=0, css_classes=["heading"])
 
@@ -410,14 +429,7 @@ class TracerWindow(Gtk.ApplicationWindow):
         self.copy_btn = Gtk.Button(label="Copy SVG", sensitive=False)
         self.copy_btn.connect("clicked", self.on_copy)
         header.pack_end(self.copy_btn)
-
-        view = Gtk.Box(css_classes=["linked"])
-        self.vec_toggle = Gtk.ToggleButton(label="Vector", active=True)
-        orig_toggle = Gtk.ToggleButton(label="Original", group=self.vec_toggle)
-        self.vec_toggle.connect("toggled", self.on_view_toggled)
-        view.append(self.vec_toggle)
-        view.append(orig_toggle)
-        header.set_title_widget(view)
+        header.set_title_widget(Gtk.Label(label="Image Tracer", css_classes=["title"]))
 
     def _build_layout(self) -> Gtk.Box:
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL, position=350,
@@ -430,17 +442,27 @@ class TracerWindow(Gtk.ApplicationWindow):
         paned.set_start_child(scroll)
 
         main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.canvas = Canvas()
-        main.append(self.canvas)
+        self.orig_canvas = Canvas(show_original=True)
+        self.canvas = Canvas()  # the vector result
+        # Equal halves, so both previews are drawn at the same size.
+        previews = Gtk.Box(homogeneous=True, vexpand=True)
+        previews.append(_titled("Original", self.orig_canvas))
+        vector = _titled("Vector", self.canvas)
+        vector.add_css_class("vector-pane")
+        previews.append(vector)
+        main.append(previews)
         self.status = Gtk.Label(xalign=0, margin_start=10, margin_end=10, margin_top=4,
                                 margin_bottom=4, label="No image loaded",
-                                css_classes=["dim-label"])
+                                css_classes=["dim-label"], ellipsize=Pango.EllipsizeMode.END)
+        # Long status lines must not widen the window; the full text is in the tooltip.
+        self.status.bind_property("label", self.status, "tooltip-text")
         main.append(self.status)
         paned.set_end_child(main)
 
-        drop = Gtk.DropTarget.new(Gio.File, Gdk.DragAction.COPY)
-        drop.connect("drop", self.on_drop)
-        self.canvas.add_controller(drop)
+        for canvas in (self.orig_canvas, self.canvas):
+            drop = Gtk.DropTarget.new(Gio.File, Gdk.DragAction.COPY)
+            drop.connect("drop", self.on_drop)
+            canvas.add_controller(drop)
         return sidebar
 
     def _build_presets(self, box):
@@ -673,6 +695,7 @@ class TracerWindow(Gtk.ApplicationWindow):
         self.result = None
         self.canvas.result = None
         self.canvas.set_original(img)
+        self.orig_canvas.set_original(img)
         self.set_title(f"Image Tracer — {os.path.basename(path)}")
         self.retrace()
 
@@ -735,10 +758,6 @@ class TracerWindow(Gtk.ApplicationWindow):
         if self.result:
             self.get_clipboard().set(self.result.to_svg())
             self.status.set_label("SVG copied to clipboard")
-
-    def on_view_toggled(self, *_):
-        self.canvas.show_original = not self.vec_toggle.get_active()
-        self.canvas.queue_draw()
 
 
 class TracerApp(Gtk.Application):
