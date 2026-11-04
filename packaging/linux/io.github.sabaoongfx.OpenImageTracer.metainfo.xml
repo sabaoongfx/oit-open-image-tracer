@@ -34,6 +34,13 @@
     <control>keyboard</control>
   </supports>
   <releases>
+    <release version="0.1.2" date="2026-11-05">
+      <description>
+        <p>Renamed to Open Image Tracer. The window now uses the system's own title bar,
+        tracing shows a colored progress bar with a percentage, and Windows also gets an
+        .msi installer.</p>
+      </description>
+    </release>
     <release version="0.1.1" date="2026-11-04">
       <description>
         <p>Native packages for Debian/Ubuntu, Fedora and Arch, an AppImage, and Windows and macOS installers.</p>
