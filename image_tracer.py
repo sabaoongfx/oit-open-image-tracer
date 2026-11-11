@@ -6,6 +6,8 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import math
+import re
 import os
 import sys
 import threading
@@ -48,12 +50,25 @@ CSS = b"""
 .thumb-label { font-size: 0.8em; }
 .thumb-pic { border-radius: 4px; }
 .value-entry { min-height: 0; padding-top: 2px; padding-bottom: 2px; }
-.trace-progress trough { min-height: 8px; border-radius: 4px; border: none;
-                         background-color: alpha(currentColor, 0.12); }
-.trace-progress progress { min-height: 8px; border-radius: 4px; border: none;
-                           background-image: linear-gradient(to right,
-                               #7c5cff, #3b82f6, #22c55e, #f97316); }
+/* Tracing card over the previews; always dark, like the design reference. */
+.trace-card { background-color: alpha(#1c1e26, 0.97); color: #f2f4f8;
+              border: 1px solid alpha(white, 0.12); border-radius: 14px;
+              padding: 26px 34px 22px 34px;
+              box-shadow: 0 12px 36px alpha(black, 0.55); }
+.trace-card .card-title { font-size: 1.3em; font-weight: 600; letter-spacing: 1px; }
+.trace-card .card-pct { font-size: 1.1em; }
+.trace-card .card-detail { color: alpha(#f2f4f8, 0.65); }
+.trace-card .card-stage { font-size: 1.1em; }
+.trace-card button { color: #f2f4f8; background: alpha(white, 0.08);
+                     border: 1px solid alpha(white, 0.14); border-radius: 8px;
+                     padding: 6px 26px; box-shadow: none; }
+.trace-card button:hover { background: alpha(white, 0.15); }
 .toolbar-row { padding: 6px 8px; }
+.drop-zone { background-color: alpha(black, 0.2); }
+.drop-zone.light { background-color: alpha(black, 0.05); }
+.drop-zone:drop(active) { box-shadow: inset 0 0 0 2px #3b82f6; }
+.drop-zone .drop-button { padding: 18px 28px; border-radius: 12px; }
+.drop-zone .drop-label { font-size: 1.35em; }
 .vector-pane { border-left: 1px solid alpha(currentColor, 0.15); }
 """
 
@@ -226,6 +241,12 @@ class TraceWorker:
             self._cond.notify()
             return self.generation
 
+    def cancel(self):
+        """Stop the running trace and drop any queued one."""
+        with self._cond:
+            self.generation += 1
+            self._pending = None
+
     def _run(self):
         while True:
             with self._cond:
@@ -261,7 +282,6 @@ class Canvas(Gtk.DrawingArea):
         self.result: te.TraceResult | None = None
         self.surface: cairo.ImageSurface | None = None  # original bitmap
         self.show_original = show_original
-        self.progress: tuple[float, str] | None = None  # (fraction, label) while tracing
         self.set_draw_func(self._draw)
 
     def set_original(self, pil_img):
@@ -303,19 +323,9 @@ class Canvas(Gtk.DrawingArea):
             cr.paint()
         elif self.result is not None:
             self._draw_result(cr, self.result)
-        else:  # first trace still running: faded image + note, never a fake "result"
+        else:  # no result yet: faded image (the tracing card sits on top), never a fake result
             cr.set_source_surface(self.surface, 0, 0)
-            cr.paint_with_alpha(0.2)
-            cr.identity_matrix()
-            fraction, label = self.progress or (0.0, "Tracing")
-            r, g, b = progress_color(fraction)
-            cr.set_source_rgb(r / 255, g / 255, b / 255)
-            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-            cr.set_font_size(16)
-            msg = f"{label}… {round(fraction * 100)}%"
-            ext = cr.text_extents(msg)
-            cr.move_to((width - ext.width) / 2, height / 2)
-            cr.show_text(msg)
+            cr.paint_with_alpha(0.25)
 
     @staticmethod
     def _draw_result(cr, result: te.TraceResult):
@@ -383,6 +393,40 @@ def _grid() -> Gtk.FlowBox:
                        selection_mode=Gtk.SelectionMode.NONE, column_spacing=4, row_spacing=4)
 
 
+def _draw_upload_icon(area, cr, width, height):
+    """Outlined folder with an up arrow, in the theme's text color."""
+    fg = area.get_color()
+    cr.set_source_rgba(fg.red, fg.green, fg.blue, fg.alpha)
+    lw = 2.0
+    cr.set_line_width(lw)
+    cr.set_line_join(cairo.LINE_JOIN_ROUND)
+    cr.set_line_cap(cairo.LINE_CAP_ROUND)
+    x0, y0, x1, y1, r = lw, lw, width - lw, height - lw, 5.0
+    tab_w, tab_h = width * 0.38, 6.0
+    top = y0 + tab_h
+    # folder outline: tab on the top left, rounded corners
+    cr.move_to(x0, top + r)
+    cr.arc(x0 + r, y0 + r, r, math.pi, 1.5 * math.pi)
+    cr.line_to(x0 + tab_w - 3, y0)
+    cr.line_to(x0 + tab_w + 4, top)
+    cr.line_to(x1 - r, top)
+    cr.arc(x1 - r, top + r, r, 1.5 * math.pi, 2 * math.pi)
+    cr.line_to(x1, y1 - r)
+    cr.arc(x1 - r, y1 - r, r, 0, 0.5 * math.pi)
+    cr.line_to(x0 + r, y1)
+    cr.arc(x0 + r, y1 - r, r, 0.5 * math.pi, math.pi)
+    cr.close_path()
+    cr.stroke()
+    # up arrow
+    cx, ay0, ay1, head = width / 2, top + 9, y1 - 9, 9
+    cr.move_to(cx, ay1)
+    cr.line_to(cx, ay0)
+    cr.move_to(cx - head, ay0 + head)
+    cr.line_to(cx, ay0)
+    cr.line_to(cx + head, ay0 + head)
+    cr.stroke()
+
+
 def _titled(title: str, child: Gtk.Widget) -> Gtk.Box:
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
     box.append(Gtk.Label(label=title, xalign=0, margin_start=10, margin_top=4,
@@ -394,6 +438,102 @@ def _titled(title: str, child: Gtk.Widget) -> Gtk.Box:
 # Progress colors (the app icon's): purple -> blue -> green -> orange.
 PROGRESS_STOPS = [(0.0, (0x7c, 0x5c, 0xff)), (0.35, (0x3b, 0x82, 0xf6)),
                   (0.7, (0x22, 0xc5, 0x5e)), (1.0, (0xf9, 0x73, 0x16))]
+
+
+class RingSpinner(Gtk.DrawingArea):
+    """Spinning arc (blue, fading tail) for the tracing card; drawn here so it
+    looks the same on every platform and icon theme."""
+
+    def __init__(self, size: int = 40):
+        super().__init__(content_width=size, content_height=size, valign=Gtk.Align.CENTER)
+        self._tick = 0
+        self.set_draw_func(self._draw)
+
+    def start(self):
+        if not self._tick:
+            self._tick = self.add_tick_callback(lambda *_: self.queue_draw() or True)
+
+    def stop(self):
+        if self._tick:
+            self.remove_tick_callback(self._tick)
+            self._tick = 0
+
+    def _draw(self, _area, cr, width, height):
+        t = GLib.get_monotonic_time() / 1_000_000
+        cx, cy, r = width / 2, height / 2, min(width, height) / 2 - 4
+        cr.set_line_width(3.5)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.set_source_rgba(1, 1, 1, 0.08)
+        cr.arc(cx, cy, r, 0, 2 * math.pi)
+        cr.stroke()
+        head = (t * 2 * math.pi * 0.9) % (2 * math.pi)
+        steps = 24  # tail fades out over 3/4 of a turn
+        for i in range(steps):
+            a0 = head - 1.5 * math.pi * (i + 1) / steps
+            a1 = head - 1.5 * math.pi * i / steps
+            cr.set_source_rgba(0.231, 0.510, 0.965, 1.0 - i / steps)
+            cr.arc(cx, cy, r, a0, a1)
+            cr.stroke()
+
+
+class GlowBar(Gtk.DrawingArea):
+    """Progress bar of the tracing card: the app's progress gradient
+    (PROGRESS_STOPS) with a soft glow, drawn the same on every platform."""
+    BAR_H, GLOW = 10, 8
+
+    def __init__(self, width: int = 340):
+        super().__init__(content_width=width, content_height=self.BAR_H + 2 * self.GLOW)
+        self.fraction = 0.0
+        self.set_draw_func(self._draw)
+
+    def set_fraction(self, fraction: float):
+        self.fraction = min(max(fraction, 0.0), 1.0)
+        self.queue_draw()
+
+    @staticmethod
+    def _pill(cr, x, y, w, h):
+        r = h / 2
+        cr.new_sub_path()
+        cr.arc(x + w - r, y + r, r, -math.pi / 2, math.pi / 2)
+        cr.arc(x + r, y + r, r, math.pi / 2, 3 * math.pi / 2)
+        cr.close_path()
+
+    def _draw(self, _area, cr, width, height):
+        g, h = self.GLOW, self.BAR_H
+        x0, y0, w = g, g, width - 2 * g
+        cr.set_source_rgba(1, 1, 1, 0.10)  # trough
+        self._pill(cr, x0, y0, w, h)
+        cr.fill()
+        fw = max(w * self.fraction, h if self.fraction > 0 else 0)
+        if fw <= 0:
+            return
+        grad = cairo.LinearGradient(x0, 0, x0 + w, 0)  # colors span the full bar
+        for pos, (r, gg, b) in PROGRESS_STOPS:
+            grad.add_color_stop_rgb(pos, r / 255, gg / 255, b / 255)
+        for i in range(g, 0, -1):  # glow: wider, fainter copies underneath
+            cr.push_group()
+            self._pill(cr, x0 - i, y0 - i, fw + 2 * i, h + 2 * i)
+            cr.set_source(grad)
+            cr.fill()
+            cr.pop_group_to_source()
+            cr.paint_with_alpha(0.05)
+        self._pill(cr, x0, y0, fw, h)
+        cr.set_source(grad)
+        cr.fill()
+
+
+CARD_DELAY_MS = 400  # a retrace shows the tracing card only if it runs longer
+
+
+def _stage_lines(label: str, mode: str) -> tuple[str, str]:
+    """Card text for an engine progress label: (stage, detail line)."""
+    m = re.fullmatch(r"Tracing layers (\d+)/(\d+)", label)
+    if m:
+        what = "color" if mode in ("multi_colors", "quant") else "layer"
+        return "Tracing shapes…", f"{what.capitalize()} {m[1]} of {m[2]}"
+    if label == "Starting":
+        return "Starting…", ""
+    return f"{label}…", ""
 
 
 def progress_color(fraction: float) -> tuple[int, int, int]:
@@ -496,29 +636,89 @@ class TracerWindow(Gtk.ApplicationWindow):
         vector = _titled("Vector", self.canvas)
         vector.add_css_class("vector-pane")
         previews.append(vector)
-        main.append(previews)
+        # Until an image is loaded the whole area is one drop zone.
+        self.view_stack = Gtk.Stack(vexpand=True)
+        self.view_stack.add_named(self._build_drop_zone(), "empty")
+        self.view_stack.add_named(previews, "previews")
+        overlay = Gtk.Overlay(child=self.view_stack)
+        overlay.add_overlay(self._build_trace_card())
+        main.append(overlay)
         status_row = Gtk.Box(spacing=10, margin_start=10, margin_end=10, margin_top=4,
                              margin_bottom=4)
-        self.status = Gtk.Label(xalign=0, hexpand=True, label="No image loaded",
+        self.status = Gtk.Label(xalign=0, hexpand=True, label="",
                                 css_classes=["dim-label"], ellipsize=Pango.EllipsizeMode.END)
         # Long status lines must not widen the window; the full text is in the tooltip.
         self.status.bind_property("label", self.status, "tooltip-text")
         status_row.append(self.status)
-        self.progress_box = Gtk.Box(spacing=8, visible=False)
-        self.progress_bar = Gtk.ProgressBar(valign=Gtk.Align.CENTER, width_request=220,
-                                            css_classes=["trace-progress"])
-        self.progress_pct = Gtk.Label(width_chars=5, xalign=1.0)
-        self.progress_box.append(self.progress_bar)
-        self.progress_box.append(self.progress_pct)
-        status_row.append(self.progress_box)
         main.append(status_row)
         paned.set_end_child(main)
 
-        for canvas in (self.orig_canvas, self.canvas):
+        for target in (self.drop_zone, self.orig_canvas, self.canvas):
             drop = Gtk.DropTarget.new(Gio.File, Gdk.DragAction.COPY)
             drop.connect("drop", self.on_drop)
-            canvas.add_controller(drop)
+            target.add_controller(drop)
         return sidebar
+
+    def _build_trace_card(self) -> Gtk.Widget:
+        """Progress card centered over the previews while a trace runs."""
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, visible=False,
+                       halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER,
+                       css_classes=["trace-card"])
+        card.append(Gtk.Label(label="TRACING IMAGE…", css_classes=["card-title"]))
+        self.progress_bar = GlowBar()
+        card.append(self.progress_bar)
+        self.progress_pct = Gtk.Label(css_classes=["card-pct"])
+        card.append(self.progress_pct)
+        row = Gtk.Box(spacing=16, margin_top=4, halign=Gtk.Align.START)
+        self.card_spinner = RingSpinner()
+        row.append(self.card_spinner)
+        lines = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+        self.card_stage = Gtk.Label(xalign=0, width_chars=24, max_width_chars=30,
+                                    css_classes=["card-stage"],
+                                    ellipsize=Pango.EllipsizeMode.END)
+        self.card_detail = Gtk.Label(xalign=0, css_classes=["card-detail"],
+                                     ellipsize=Pango.EllipsizeMode.END, max_width_chars=30)
+        lines.append(self.card_stage)
+        lines.append(self.card_detail)
+        row.append(lines)
+        card.append(row)
+        cancel = Gtk.Button(label="Cancel", halign=Gtk.Align.CENTER, margin_top=8)
+        cancel.connect("clicked", self.on_cancel_trace)
+        card.append(cancel)
+        self.trace_card = card
+        self._card_timer = 0
+        return card
+
+    def _build_drop_zone(self) -> Gtk.Widget:
+        """First screen: a folder-upload icon and "Drag and drop an image here".
+        Icon and text together are also a button that opens the file dialog."""
+        self.drop_zone = Gtk.Box(css_classes=["drop-zone"], hexpand=True, vexpand=True)
+        btn = Gtk.Button(css_classes=["flat", "drop-button"], halign=Gtk.Align.CENTER,
+                         valign=Gtk.Align.CENTER, hexpand=True,
+                         tooltip_text="Choose an image…")
+        btn.set_cursor(Gdk.Cursor.new_from_name("pointer"))
+        btn.connect("clicked", self.on_open)
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        icon = Gtk.DrawingArea(content_width=64, content_height=52, halign=Gtk.Align.CENTER)
+        icon.set_draw_func(_draw_upload_icon)
+        inner.append(icon)
+        inner.append(Gtk.Label(label="Drag and drop an image here", css_classes=["drop-label"]))
+        btn.set_child(inner)
+        self.drop_zone.append(btn)
+        self.drop_zone.connect("realize", self._update_drop_tint)
+        settings = Gtk.Settings.get_default()
+        for prop in ("gtk-theme-name", "gtk-application-prefer-dark-theme"):
+            settings.connect(f"notify::{prop}",
+                             lambda *_: GLib.idle_add(lambda: self._update_drop_tint() or False))
+        return self.drop_zone
+
+    def _update_drop_tint(self, *_):
+        """A dark tint suits dark themes (as in the design); light themes get a
+        faint one. Dark text color = light theme."""
+        fg = self.drop_zone.get_color()
+        light = (fg.red + fg.green + fg.blue) / 3 < 0.5
+        if self.drop_zone.has_css_class("light") != light:
+            (self.drop_zone.add_css_class if light else self.drop_zone.remove_css_class)("light")
 
     def _build_presets(self, box):
         box.append(_heading("Preset"))
@@ -715,20 +915,50 @@ class TracerWindow(Gtk.ApplicationWindow):
     def retrace(self):
         if not self.image:
             return
-        self.worker.submit(self.image, self.options())
+        opts = self.options()
+        self._trace_mode = opts.mode
+        self.worker.submit(self.image, opts)
         self.busy = True
         self._show_progress(0.0, "Starting")
+        # First trace: show the card at once. Retraces (slider drags) are usually
+        # quick, so the card only appears if one takes a while.
+        if self.canvas.result is None:
+            self._show_card()
+        elif not self.trace_card.get_visible() and not self._card_timer:
+            self._card_timer = GLib.timeout_add(CARD_DELAY_MS, self._show_card)
+
+    def _show_card(self):
+        self._card_timer = 0
+        if self.busy:
+            self.trace_card.set_visible(True)
+            self.card_spinner.start()
+        return False
+
+    def _hide_card(self):
+        if self._card_timer:
+            GLib.source_remove(self._card_timer)
+            self._card_timer = 0
+        self.trace_card.set_visible(False)
+        self.card_spinner.stop()
 
     def _show_progress(self, fraction, label):
         pct = round(fraction * 100)
         r, g, b = progress_color(fraction)
-        self.progress_box.set_visible(True)
         self.progress_bar.set_fraction(fraction)
-        self.progress_pct.set_markup(f'<b><span foreground="#{r:02x}{g:02x}{b:02x}">{pct}%</span></b>')
+        self.progress_pct.set_markup(
+            f'<b><span foreground="#{r:02x}{g:02x}{b:02x}">{pct}%</span></b> Completed')
+        stage, detail = _stage_lines(label, self._trace_mode)
+        self.card_stage.set_label(stage)
+        self.card_detail.set_label(detail)
+        self.card_detail.set_visible(bool(detail))
         self.status.set_label(f"{label}…")
-        self.canvas.progress = (fraction, label)
-        if self.canvas.result is None:
-            self.canvas.queue_draw()
+
+    def on_cancel_trace(self, *_):
+        self.worker.cancel()
+        self.busy = False
+        self._hide_card()
+        self.status.set_label("Tracing cancelled — change a setting or press Update preview"
+                              if self.live.get_active() else "Tracing cancelled")
 
     def _trace_progress(self, gen, fraction, label):
         if gen == self.worker.generation and self.busy:
@@ -739,8 +969,7 @@ class TracerWindow(Gtk.ApplicationWindow):
         if gen != self.worker.generation:
             return False  # a newer request is on its way
         self.busy = False
-        self.progress_box.set_visible(False)
-        self.canvas.progress = None
+        self._hide_card()
         if err is not None:
             self.status.set_label(f"Error: {err}")
             return False
@@ -765,6 +994,7 @@ class TracerWindow(Gtk.ApplicationWindow):
             self.status.set_label(f"Could not open {path}: {e}")
             return
         self.image, self.image_path = img, path
+        self.view_stack.set_visible_child_name("previews")
         self.result = None
         self.canvas.result = None
         self.canvas.set_original(img)

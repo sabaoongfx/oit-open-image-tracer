@@ -163,15 +163,25 @@ submission would also need the ID to match the repo
   Gray steps, Posterize (hint under the grid).
 - Sliders with a typeable value field instead of +/- spin buttons.
 - Previews side by side: "Image" (left) and "Vector" (right), equal halves.
+- First screen (no image yet, user's design "Frame 1 (1).png"): one drop zone
+  instead of the previews, darker than the sidebar in dark themes (faint tint
+  in light ones), drawn folder-upload icon + "Drag and drop an image here";
+  icon and text are a flat button that opens the file dialog. A `Gtk.Stack`
+  switches to the previews on load; the status line starts empty.
 - No custom header bar: the OS draws the title bar (on KDE Wayland GTK then
   uses server-side decorations; no `csd` class; on Windows `GTK_CSD=0` is set
   at startup, since GTK 4 otherwise draws its own title bar there — seen in
   the CI self-test picture). Buttons live in a toolbar
   row inside the window. Don't style the top of the window.
 - Tracing progress: `trace(..., progress=cb)` reports (fraction, label) per
-  stage and per layer; the status row shows a gradient progress bar
-  (purple → blue → green → orange, `PROGRESS_STOPS`) and a bold percentage
-  in the matching color; the Vector pane shows the same during the first trace.
+  stage and per layer. Shown in a dark card centered over the previews (user's
+  reference "Gemini_Generated_Image_sbgvq7…jpeg", adapted to the existing
+  layout): "TRACING IMAGE…", `GlowBar` (the `PROGRESS_STOPS` gradient purple →
+  blue → green → orange, with glow), bold percentage in the matching color +
+  "Completed", `RingSpinner` + stage ("Color 7 of 12" for layers), Cancel
+  (`TraceWorker.cancel()`). Bar and spinner are drawn with cairo so they look
+  the same on every OS. First trace shows the card at once; retraces only
+  after `CARD_DELAY_MS` (no flicker while dragging sliders).
 - App icon: the pen-and-pixels design (`assets/icon-source.jpg`, white
   background made transparent by `make_app_icon.py`).
 
