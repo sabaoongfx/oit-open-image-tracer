@@ -103,14 +103,17 @@ while even after force-cancel.
 Release state:
 - v0.1.0 — Flatpak only (published).
 - v0.1.1 — published 2026-11-04: Flatpak, AppImage, deb, rpm, pacman, Windows
-  setup.exe, macOS dmg arm64 + Intel; all CI self-tested with OCR. Its MSI was
-  empty (172 KB: WiX resolved a relative Source path from the .wxs folder) and
-  was removed before publishing; release notes promise an MSI "shortly".
-- Fixed on `main` (commit 3b5a774, not yet run): absolute WiX paths, build
-  fails if the MSI is < 20 MB, MSI is installed on the runner and the
-  installed app self-tested. **Next (when the user says so):** run the
-  workflow, download `pkg-windows`, attach the MSI (versioned + versionless) to
-  v0.1.1 and add both to its SHA256SUMS.
+  setup.exe, macOS dmg arm64 + Intel. No MSI (its build was empty: WiX resolved
+  a relative Source path from the .wxs folder); release notes promised one
+  "shortly" — v0.1.2 delivered it instead, nothing attached to v0.1.1.
+- v0.1.2 — published 2026-11-04: all formats including a working MSI
+  (absolute WiX paths, build fails if the MSI is < 20 MB, MSI installed on the
+  runner and self-tested).
+- On `main` since v0.1.2 (CI run 43086108286 on 2026-11-11: all jobs and
+  self-tests green, Windows MSI 70 MB): helper tools run without console
+  windows on Windows (`_run`, CREATE_NO_WINDOW), drop-zone first screen,
+  tracing progress card. Not released yet; the next release would be v0.1.3
+  (bump VERSION, PKGBUILD `pkgver`, spec `Version`, metainfo `<release>`).
 
 Signed apt + pacman repos (like Open Task Manager/notz): GitHub Pages of this
 repo, https://sabaoongfx.github.io/oit-open-image-tracer/ (`/KEY.gpg`,
