@@ -34,6 +34,12 @@
     <control>keyboard</control>
   </supports>
   <releases>
+    <release version="0.1.3" date="2026-11-11">
+      <description>
+        <p>A drop-zone first screen, a tracing progress card, and no console windows
+        flashing up on Windows.</p>
+      </description>
+    </release>
     <release version="0.1.2" date="2026-11-05">
       <description>
         <p>Renamed to Open Image Tracer. The window now uses the system's own title bar,

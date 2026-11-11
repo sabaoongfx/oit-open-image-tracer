@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 Name:           open-image-tracer
-Version:        0.1.2
+Version:        0.1.3
 Release:        1%{?dist}
 Summary:        Convert images into SVG vectors
 License:        GPL-3.0-or-later
@@ -43,6 +43,8 @@ side-by-side preview.
 %exclude %{_datadir}/licenses/open-image-tracer/LICENSE
 
 %changelog
+* Wed Nov 11 2026 Sabaoon <sabaoongfx@gmail.com> - 0.1.3-1
+- Drop-zone first screen; tracing progress card; no console windows on Windows
 * Thu Nov 05 2026 Sabaoon <sabaoongfx@gmail.com> - 0.1.2-1
 - Renamed to Open Image Tracer; native title bar; colored tracing progress; MSI installer
 * Wed Nov 04 2026 Sabaoon <sabaoongfx@gmail.com> - 0.1.1-1
