@@ -128,6 +128,14 @@ def _tool(name: str) -> str | None:
     return shutil.which(name)
 
 
+def _run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
+    """subprocess.run for helper tools. On Windows the app has no console, so
+    each child would otherwise flash up its own console window."""
+    if os.name == "nt":
+        kw.setdefault("creationflags", subprocess.CREATE_NO_WINDOW)
+    return subprocess.run(cmd, **kw)
+
+
 def _tesseract_env() -> dict | None:
     """Environment for a bundled tesseract (points it at the bundled data)."""
     if BUNDLE_DIR and os.path.isdir(os.path.join(BUNDLE_DIR, "tessdata")):
@@ -288,7 +296,7 @@ def _font_for(family: str):
         fc = _tool("fc-match")
         if not fc:
             raise FileNotFoundError("fc-match")
-        path = subprocess.run([fc, "-f", "%{file}", first], capture_output=True,
+        path = _run([fc, "-f", "%{file}", first], capture_output=True,
                               text=True, timeout=10).stdout.strip()
         if path:
             font = ImageFont.truetype(path, 100)
@@ -460,7 +468,7 @@ def _ai_upscale(rgb: np.ndarray, scale: int, name: str) -> tuple[np.ndarray | No
         model_dir = next((d for d in backend.model_dirs if os.path.isdir(d)), None)
         if model_dir:
             cmd += ["-m", model_dir]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        proc = _run(cmd, capture_output=True, text=True, timeout=600)
         if not os.path.exists(dst):
             err = (proc.stderr or proc.stdout).strip().splitlines()[-1:] or ["no output"]
             raise RuntimeError(err[0])
@@ -493,7 +501,7 @@ def ocr_status() -> tuple[bool, str]:
             _OCR_STATUS = (False, "OCR needs tesseract: sudo pacman -S tesseract tesseract-data-eng")
         else:
             try:
-                langs = subprocess.run([_tool("tesseract"), "--list-langs"], capture_output=True,
+                langs = _run([_tool("tesseract"), "--list-langs"], capture_output=True,
                                        text=True, timeout=20, env=_tesseract_env()).stdout.split()
             except (OSError, subprocess.SubprocessError) as e:
                 log.warning("tesseract --list-langs failed: %s", e)
@@ -750,7 +758,7 @@ def _run_tesseract(gray: Image.Image, factor: int) -> list[OcrWord]:
     try:
         path = os.path.join(tmp, "in.png")
         gray.save(path)
-        proc = subprocess.run([_tool("tesseract"), path, "stdout", "--psm", "11", "tsv"],
+        proc = _run([_tool("tesseract"), path, "stdout", "--psm", "11", "tsv"],
                               capture_output=True, text=True, timeout=120, env=_tesseract_env())
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
